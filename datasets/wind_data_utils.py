@@ -8,7 +8,7 @@ import os
 
 def get_winddata(target_dir: str = "global_wind_dataset", resolution: int = 5):
     """
-    This function downloads and saves global wind data from weatherbench
+    This function downloads the global wind data from weatherbench
     https://github.com/pangeo-data/WeatherBench
     Args:
         target_dir: target directory to save wind data
@@ -32,8 +32,8 @@ def get_winddata(target_dir: str = "global_wind_dataset", resolution: int = 5):
     print("fetching url for v component...")
     r_v = requests.get(url_v)
 
-    zipfile_u = "10m_u_component_of_wind_5.625deg.zip"
-    zipfile_v = "10m_v_component_of_wind_5.625deg.zip"
+    zipfile_u = "10m_u_component_of_wind_{res}deg.zip"
+    zipfile_v = "10m_v_component_of_wind_{res}deg.zip"
 
     print("saving contents of u component...")
     open(zipfile_u, 'wb').write(r_u.content)
