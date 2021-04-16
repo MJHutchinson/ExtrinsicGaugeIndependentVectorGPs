@@ -12,7 +12,7 @@ def get_winddata(target_dir: str = "global_wind_dataset", resolution: int = 5):
     https://github.com/pangeo-data/WeatherBench
     Args:
         target_dir: target directory to save wind data
-        resolution: resolution of wind data. To choose from 1, 2 or 5.
+        resolution: resolution of wind data. To choose between 1, 2 or 5.
     """
     if resolution == 1:
         res = 1.40625
@@ -58,15 +58,22 @@ def get_winddata(target_dir: str = "global_wind_dataset", resolution: int = 5):
     print("complete! data saved on: " + target_dir)
 
 
-class DataGenerator(keras.utils.Sequence):
-    def __init__(self, ds, var_dict, lead_time, batch_size=32, shuffle=True, load=True, mean=None, std=None):
+class WindDataGenerator(keras.utils.Sequence):
+    def __init__(
+        self,
+        ds: xr.Dataset,
+        step_size: int,
+        seq_len: int,
+        lead_time: int,
+        batch_size: int,
+        shuffle = True,
+        load = True,
+        mean = None,
+        std = None):
         """
-        Data generator for WeatherBench data.
-        Template from https://stanford.edu/~shervine/blog/keras-how-to-generate-data-on-the-fly
+        Adapted from https://github.com/pangeo-data/WeatherBench/blob/master/src/train_nn.py
         Args:
             ds: Dataset containing all variables
-            var_dict: Dictionary of the form {'var': level}. Use None for level if data is of single level
-            lead_time: Lead time in hours
             batch_size: Batch size
             shuffle: bool. If True, data is shuffled.
             load: bool. If True, datadet is loaded into RAM.
@@ -74,33 +81,28 @@ class DataGenerator(keras.utils.Sequence):
             std: If None, compute standard deviation from data.
         """
 
-        self.ds = ds
-        self.var_dict = var_dict
         self.batch_size = batch_size
         self.shuffle = shuffle
-        self.lead_time = lead_time
-
-        data = []
-        generic_level = xr.DataArray([1], coords={'level': [1]}, dims=['level'])
-        for var, levels in var_dict.items():
-            try:
-                data.append(ds[var].sel(level=levels))
-            except ValueError:
-                data.append(ds[var].expand_dims({'level': generic_level}, 1))
-
-        self.data = xr.concat(data, 'level').transpose('time', 'lat', 'lon', 'level')
-        self.mean = self.data.mean(('time', 'lat', 'lon')).compute() if mean is None else mean
-        self.std = self.data.std('time').mean(('lat', 'lon')).compute() if std is None else std
+        self.step_size = step_size
+        self.seq_len = seq_len
+        
         # Normalize
-        self.data = (self.data - self.mean) / self.std
-        self.n_samples = self.data.isel(time=slice(0, -lead_time)).shape[0]
-        self.init_time = self.data.isel(time=slice(None, -lead_time)).time
-        self.valid_time = self.data.isel(time=slice(lead_time, None)).time
+        data_array = ds.to_array('components')
+        self.mean = data_array.mean(('time', 'lat', 'lon')).compute() if mean is None else mean
+        self.std = data_array.std('time').mean(('lat', 'lon')).compute() if std is None else std
+        self.data = (data_array - self.mean) / self.std
+
+        if lead_time == 0:
+            self.n_samples = self.data.shape[0]
+        elif lead_time > 0 and isinstance(lead_time, int):
+            self.n_samples = self.data.isel(time=slice(0, -lead_time)).shape[0]
+        else:
+            raise ValueError('Lead time must be a non-negative integer')
 
         self.on_epoch_end()
 
-        # For some weird reason calling .load() earlier messes up the mean and std computations
-        if load: print('Loading data into RAM'); self.data.load()
+        # Load data into RAM (this speeds up the data loading process)
+        if load: self.data.load()
 
     def __len__(self):
         'Denotes the number of batches per epoch'
@@ -109,8 +111,14 @@ class DataGenerator(keras.utils.Sequence):
     def __getitem__(self, i):
         'Generate one batch of data'
         idxs = self.idxs[i * self.batch_size:(i + 1) * self.batch_size]
-        X = self.data.isel(time=idxs).values
-        y = self.data.isel(time=idxs + self.lead_time).values
+        start_idxs = idxs
+        end_idxs = idxs + self.seq_len * self.step_size
+        step = self.step_size
+        X = []
+        for start, end in zip(start_idxs, end_idxs):
+            X.append(self.data.isel(time=slice(start, end, step)).values)
+        X = np.stack(X) # Size (batch, seq_len, 2, lat, lon)
+        y = self.data.isel(time=end_idxs + self.lead_time).values[:, None, :, :, :]
         return X, y
 
     def on_epoch_end(self):
@@ -118,6 +126,3 @@ class DataGenerator(keras.utils.Sequence):
         self.idxs = np.arange(self.n_samples)
         if self.shuffle == True:
             np.random.shuffle(self.idxs)
-
-if __name__ == "__main__":
-    get_winddata()
