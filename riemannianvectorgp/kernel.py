@@ -106,7 +106,7 @@ class ScaledTFPKernel(AbstractKernel):
         Args:
             num_samples: the number of samples to draw.
         """
-        if self.kernel_class == tfk.ExponentiatedQuadratic:
+        if self.tfp_class == tfk.ExponentiatedQuadratic:
             return jr.normal(key, (self.output_dimension, self.input_dimension, num_samples))
         else: 
             raise Exception("Spectral measure not implemented for this kernel.")
