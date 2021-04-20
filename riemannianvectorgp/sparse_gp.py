@@ -19,11 +19,12 @@ class SparseGaussianProcessParameters(NamedTuple):
     kernel_params: NamedTuple
 
 class SparseGaussianProcessState(NamedTuple): 
-    prior_frequency: jnp.ndarray
-    prior_phase: jnp.ndarray
+    # prior_frequency: jnp.ndarray
+    # prior_phase: jnp.ndarray
     prior_weights: jnp.ndarray
     inducing_weights: jnp.ndarray
     cholesky: jnp.ndarray
+    fourier_feature_state: NamedTuple
 
 class SparseGaussianProcess: 
     """A sparse Gaussian process, implemented as a Haiku module.

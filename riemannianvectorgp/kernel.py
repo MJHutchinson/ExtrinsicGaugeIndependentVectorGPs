@@ -8,6 +8,33 @@ import tensorflow_probability
 tfp = tensorflow_probability.experimental.substrates.jax
 tfk = tfp.math.psd_kernels
 
+class FourierFeatures(ABC):
+    def init_state(
+        self,
+        key: jnp.ndarray,
+        ):
+        pass
+
+    @abstractmethod
+    def prior(
+        self,
+        state: NamedTuple,
+        x: jnp.ndarray,
+    ) -> jnp.ndarray:
+        pass
+
+class DeterministicFourierFeatures(FourierFeatures):
+    pass
+
+class RandomFourierFeatures(FourierFeatures):
+    pass
+
+class RandomFourierFeatureState(NamedTuple):
+    phase: jnp.ndarray,
+    frequency: jnp.ndarray,
+
+
+
 class AbstractKernel(ABC):
     @abstractmethod 
     def init_params(
@@ -25,27 +52,10 @@ class AbstractKernel(ABC):
     ) -> jnp.ndarray:
         pass
 
-    @abstractmethod 
-    def standard_spectral_measure(
-        self,
-        key: jnp.ndarray,
-        num_samples: int
-    ) -> jnp.ndarray:
-        pass
-
-    @abstractmethod 
-    def spectral_weights(
-        self,
-        params: NamedTuple,
-        frequency: jnp.ndarray,
-    ) -> Tuple[jnp.ndarray,jnp.ndarray]:
-        pass
-
 
 class ScaledKernelParameters(NamedTuple):
     log_amplitudes: jnp.ndarray
     log_length_scales: jnp.ndarray
-
 
 class ScaledTFPKernel(AbstractKernel):
     """A kernel with learned amplitude and length scale parameters.
