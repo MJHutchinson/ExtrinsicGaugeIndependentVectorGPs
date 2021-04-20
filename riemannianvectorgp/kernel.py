@@ -26,13 +26,6 @@ class AbstractKernel(ABC):
         pass
 
     @abstractmethod 
-    def kernel(
-        self,
-        params: NamedTuple,
-    ):
-        pass
-
-    @abstractmethod 
     def standard_spectral_measure(
         self,
         key: jnp.ndarray,
@@ -54,7 +47,7 @@ class ScaledKernelParameters(NamedTuple):
     log_length_scales: jnp.ndarray
 
 
-class ScaledKernel(AbstractKernel):
+class ScaledTFPKernel(AbstractKernel):
     """A kernel with learned amplitude and length scale parameters.
 
     """
@@ -67,12 +60,12 @@ class ScaledKernel(AbstractKernel):
         """Scales the given kernel input by length scales and output by amplitudes.
 
         Args:
-            kernel_class: the class of the covariance kernel.
+            tfp_class: the TensorFlow Probability class of the covariance kernel.
             input_dimension: the input space dimension.
             output_dimension: the output space dimension.
         """
         super().__init__()
-        self.kernel_class = kernel_class
+        self.tfp_class = tfp_class
         self.input_dimension = input_dimension
         self.output_dimension = output_dimension
 
@@ -97,17 +90,10 @@ class ScaledKernel(AbstractKernel):
             x1: the first input.
             x2: the second input.
         """
-        return self.kernel(params).matrix(x1,x2)
-
-    def kernel(
-        self,
-        params: ScaledKernelParameters,
-    ):
-        """Instantiates the kernel with the given parameters.
-        """
         amplitudes = jnp.exp(params.log_amplitudes)
         length_scales = jnp.exp(params.log_length_scales)
-        return self.kernel_class(amplitude = amplitudes, length_scale = length_scales)
+        tfp_kernel = self.tfp_class(amplitude = amplitudes, length_scale = length_scales)
+        return tfp_kernel.matrix(x1,x2)
 
     @partial(jit, static_argnums=(0,2))
     def standard_spectral_measure(
