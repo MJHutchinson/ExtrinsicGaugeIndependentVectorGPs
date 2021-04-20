@@ -53,7 +53,7 @@ class ScaledTFPKernel(AbstractKernel):
     """
     def __init__(
         self,
-        kernel_class: ABCMeta,
+        tfp_class: ABCMeta,
         input_dimension: int,
         output_dimension: int,
     ):
