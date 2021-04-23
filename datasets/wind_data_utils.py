@@ -3,6 +3,7 @@ import numpy as np
 import tensorflow.keras as keras
 import requests
 from zipfile import ZipFile
+from typing import Union
 import os
 
 
@@ -62,67 +63,65 @@ class WindDataGenerator(keras.utils.Sequence):
     def __init__(
         self,
         ds: xr.Dataset,
-        step_size: int,
-        seq_len: int,
-        lead_time: int,
-        batch_size: int,
-        shuffle = True,
-        load = True,
-        mean = None,
-        std = None):
+        num_obs: int,
+        window_size: int,
+        gap_size: int = 6,
+        shuffle: bool = True,
+        load: bool = True):
         """
+        Data generator for global wind dataset
         Adapted from https://github.com/pangeo-data/WeatherBench/blob/master/src/train_nn.py
         Args:
             ds: Dataset containing all variables
-            batch_size: Batch size
+            num_obs: Number of random locations where wind velocity is measured
+            window_size: Number of consecutive observations in assimilation window
+            gap_size: Gap between two observations (in hours)
             shuffle: bool. If True, data is shuffled.
             load: bool. If True, datadet is loaded into RAM.
-            mean: If None, compute mean from data.
-            std: If None, compute standard deviation from data.
         """
-
-        self.batch_size = batch_size
+        self.ds = ds
+        self.lon = ds.isel(time=0).lon.values
+        self.lat = ds.isel(time=0).lat.values
+        self.u10 = ds.u10
+        self.v10 = ds.v10
+        self.num_obs = num_obs
+        self.window_size = window_size
+        self.gap_size = gap_size
         self.shuffle = shuffle
-        self.step_size = step_size
-        self.seq_len = seq_len
-        
-        # Normalize
-        data_array = ds.to_array('components')
-        self.mean = data_array.mean(('time', 'lat', 'lon')).compute() if mean is None else mean
-        self.std = data_array.std('time').mean(('lat', 'lon')).compute() if std is None else std
-        self.data = (data_array - self.mean) / self.std
-
-        if lead_time == 0:
-            self.n_samples = self.data.shape[0]
-        elif lead_time > 0 and isinstance(lead_time, int):
-            self.n_samples = self.data.isel(time=slice(0, -lead_time)).shape[0]
-        else:
-            raise ValueError('Lead time must be a non-negative integer')
+        self.n_samples = ds.isel(time=slice(0, -window_size)).dims["time"]
+        self.n_windows = int(self.n_samples - self.gap_size * self.window_size)
 
         self.on_epoch_end()
 
         # Load data into RAM (this speeds up the data loading process)
-        if load: self.data.load()
+        if load: self.ds.load()
 
     def __len__(self):
-        'Denotes the number of batches per epoch'
-        return int(np.ceil(self.n_samples / self.batch_size))
-
+        return self.n_windows
+    
     def __getitem__(self, i):
-        'Generate one batch of data'
-        idxs = self.idxs[i * self.batch_size:(i + 1) * self.batch_size]
-        start_idxs = idxs
-        end_idxs = idxs + self.seq_len * self.step_size
-        step = self.step_size
-        X = []
-        for start, end in zip(start_idxs, end_idxs):
-            X.append(self.data.isel(time=slice(start, end, step)).values)
-        X = np.stack(X) # Size (batch, seq_len, 2, lat, lon)
-        y = self.data.isel(time=end_idxs + self.lead_time).values[:, None, :, :, :]
-        return X, y
+        start_idx = self.idxs[i]
+        X, y = [], []
+        for t in range(self.window_size):
+            u, v = [], []
+            self.lon_idxs = np.random.randint(0, self.ds.dims['lon'], size=(self.num_obs,))
+            self.lat_idxs = np.random.randint(0, self.ds.dims['lat'], size=(self.num_obs,))
+            for n in range(self.num_obs):
+                u.append(self.ds.isel(
+                    time=start_idx + self.gap_size * t,
+                    lon=self.lon_idxs[n],
+                    lat=self.lat_idxs[n]).u10.values)
+                v.append(self.ds.isel(
+                    time=start_idx + self.gap_size * t,
+                    lon=self.lon_idxs[n],
+                    lat=self.lat_idxs[n]).v10.values)
+            X.append([self.lon[self.lon_idxs], self.lat[self.lat_idxs]])
+            y.append([u, v])
+        return start_idx, np.stack(X), np.stack(y)
 
     def on_epoch_end(self):
         'Updates indexes after each epoch'
-        self.idxs = np.arange(self.n_samples)
+        self.idxs = np.arange(self.n_windows)
         if self.shuffle == True:
             np.random.shuffle(self.idxs)
+
