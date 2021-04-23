@@ -12,12 +12,8 @@ tfp = tensorflow_probability.experimental.substrates.jax
 tfk = tfp.math.psd_kernels
 
 
-class BasisFunctionState(NamedTuple):
-    pass
-
-
 class EigenBasisFunctionState(NamedTuple):
-    eigen_index: jnp.ndarray
+    eigenindicies: jnp.ndarray
 
 
 class RandomBasisFunctionState(NamedTuple):
@@ -199,9 +195,12 @@ class ScaledTFPKernel(AbstractKernel):
         num_samples: int,
     ) -> NamedTuple:
         (k1, k2) = jr.split(key)
-        frequency = jr.normal(
-            k1, (self.output_dimension, self.input_dimension, num_samples)
-        )
+        if self.tfp_class == tfk.ExponentiatedQuadratic:
+            frequency = jr.normal(
+                k1, (self.output_dimension, self.input_dimension, num_samples)
+            )
+        else:
+            raise NotImplementedError(f"Kernel not implements for {self.tfp_class}")
         phase = 2 * jnp.pi * jr.uniform(k2, (self.output_dimension, num_samples))
         return RandomBasisFunctionState(frequency, phase)
 
@@ -220,7 +219,7 @@ class ScaledTFPKernel(AbstractKernel):
         x: jnp.ndarray,
     ) -> jnp.ndarray:
 
-        amplitudes = jnp.exp(params.log_amplitudes)
+        amplitudes = jnp.exp(0.5 * params.log_amplitudes)
         length_scales = jnp.exp(params.log_length_scales)
 
         frequency = state.frequency
@@ -232,4 +231,4 @@ class ScaledTFPKernel(AbstractKernel):
         basis_fn = jnp.sqrt(2 / L) * jnp.cos(
             rescaled_x @ frequency + jnp.expand_dims(phase, -2)
         )
-        return basis_fn
+        return amplitudes * basis_fn
