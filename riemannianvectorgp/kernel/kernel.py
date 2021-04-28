@@ -1,6 +1,7 @@
 from abc import ABC, ABCMeta, abstractmethod
 from typing import NamedTuple, Tuple
 import numpy as np
+import jax
 import jax.numpy as jnp
 import jax.random as jr
 from jax import jit
@@ -89,11 +90,12 @@ class FourierFeatures:
             params, key, self.num_basis_functions
         )
         weight_variance = self.kernel.weight_variance(params, basis_function_state)
-        weights = weight_variance * jr.normal(
-            key, (num_samples, *weight_variance.shape)
-        )
+        weight_std = jnp.sqrt(weight_variance)
+        weights = weight_std * jr.normal(key, (num_samples, *weight_std.shape))
         return FourierFeatureState(basis_function_state, weights)
 
+    # JAX needs shapes to be static -> num samples needs to be static
+    @partial(jit, static_argnums=(0, 3))
     def resample_weights(
         self,
         params: NamedTuple,
@@ -104,11 +106,14 @@ class FourierFeatures:
         weight_variance = self.kernel.weight_variance(
             params, state.basis_function_state
         )
-        weights = weight_variance * jr.normal(
-            key, (num_samples, *weight_variance.shape)
+        weight_variance = self.kernel.weight_variance(
+            params, state.basis_function_state
         )
+        weight_std = jnp.sqrt(weight_variance)
+        weights = weight_std * jr.normal(key, (num_samples, *weight_variance.shape))
         return FourierFeatureState(state.basis_function_state, weights)
 
+    @partial(jit, static_argnums=(0,))
     def resample_basis(
         self,
         params: NamedTuple,
@@ -120,6 +125,7 @@ class FourierFeatures:
         )
         return FourierFeatureState(basis_function_state, state.weights)
 
+    @partial(jit, static_argnums=(0,))
     def __call__(
         self,
         params: NamedTuple,
@@ -188,6 +194,7 @@ class ScaledTFPKernel(AbstractKernel):
         tfp_kernel = self.tfp_class(amplitude=amplitudes, length_scale=length_scales)
         return tfp_kernel.matrix(x1, x2)
 
+    @partial(jit, static_argnums=(0,))
     def sample_fourier_features(
         self,
         params: NamedTuple,
@@ -204,6 +211,7 @@ class ScaledTFPKernel(AbstractKernel):
         phase = 2 * jnp.pi * jr.uniform(k2, (self.output_dimension, num_samples))
         return RandomBasisFunctionState(frequency, phase)
 
+    @partial(jit, static_argnums=(0,))
     def weight_variance(
         self,
         params: NamedTuple,
@@ -212,6 +220,7 @@ class ScaledTFPKernel(AbstractKernel):
         L = state.frequency.shape[-1]
         return jnp.ones((L))
 
+    @partial(jit, static_argnums=(0,))
     def basis_functions(
         self,
         params: NamedTuple,
