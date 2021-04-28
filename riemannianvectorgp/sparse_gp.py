@@ -251,5 +251,4 @@ class SparseGaussianProcess:
         l = n_data * jnp.sum(jnp.log(s)) + c * jnp.sum(((y - f) / s) ** 2)
 
         r = self.hyperprior(params, state)
-
         return (kl + l + r, state)
