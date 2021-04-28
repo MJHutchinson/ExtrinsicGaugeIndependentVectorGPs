@@ -70,10 +70,15 @@ class TFPKernel(AbstractKernel):
         num_samples: int,
     ) -> NamedTuple:
         (k1, k2) = jr.split(key)
-        frequency = jr.normal(
-            k1, (self.output_dimension, self.input_dimension, num_samples)
-        )
-        phase = 2 * jnp.pi * jr.uniform(k2, (self.output_dimension, num_samples))
+        if self.tfp_class == tfk.ExponentiatedQuadratic:
+            frequency = jr.normal(
+                k1, (self.output_dimension, self.input_dimension, num_samples)
+            )
+            phase = 2 * jnp.pi * jr.uniform(k2, (self.output_dimension, num_samples))
+        else:
+            raise NotImplementedError(
+                f"Fourier features not implemented for {self.kernel}"
+            )
         return RandomBasisFunctionState(frequency, phase)
 
     def weight_variance(
