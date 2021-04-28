@@ -34,6 +34,7 @@ class CompactRiemannianManifoldKernel(AbstractKernel):
     ) -> jnp.ndarray:
         pass
 
+    @partial(jit, static_argnums=(0,))
     def matrix(
         self,
         params: NamedTuple,
@@ -50,6 +51,8 @@ class CompactRiemannianManifoldKernel(AbstractKernel):
             axis=-1,
         )
 
+    # static 3 as jnp.arange needs a static length
+    @partial(jit, static_argnums=(0, 3))
     def sample_fourier_features(
         self,
         params: NamedTuple,
@@ -58,6 +61,7 @@ class CompactRiemannianManifoldKernel(AbstractKernel):
     ) -> NamedTuple:
         return EigenBasisFunctionState(jnp.arange(num_samples))
 
+    @partial(jit, static_argnums=(0,))
     def weight_variance(
         self,
         params: NamedTuple,
@@ -66,6 +70,7 @@ class CompactRiemannianManifoldKernel(AbstractKernel):
         lam = self.manifold.laplacian_eigenvalue(state.eigenindicies)
         return self.spectrum(lam, params)
 
+    @partial(jit, static_argnums=(0,))
     def basis_functions(
         self,
         params: NamedTuple,
@@ -94,6 +99,7 @@ class SquaredExponentialCompactRiemannianManifoldKernel(
             log_length_scales
         )
 
+    @partial(jit, static_argnums=(0,))
     def spectrum(
         self,
         eigenvalues: jnp.ndarray,
