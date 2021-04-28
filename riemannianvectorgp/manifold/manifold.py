@@ -8,14 +8,14 @@ class AbstractRiemannianMainfold(ABC):
     @abstractmethod
     def laplacian_eigenvalue(
         self,
-        n: int,
+        n: jnp.ndarray,
     ):
         pass
 
     @abstractmethod
     def laplacian_eigenfunction(
         self,
-        n: int,
+        n: jnp.ndarray,
         x: jnp.ndarray,
     ):
         pass
