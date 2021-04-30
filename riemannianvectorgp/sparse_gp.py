@@ -149,14 +149,18 @@ class SparseGaussianProcess:
             state.inducing_weights, state.cholesky, prior_state
         )
 
+        K = self.kernel.matrix(
+            kernel_params, inducing_locations, inducing_locations
+        ) + jax.vmap(jnp.diag)(jnp.exp(inducing_pseudo_log_err_stddev * 2))
+
         (cholesky, _) = jsp.linalg.cho_factor(
-            self.kernel.matrix(kernel_params, inducing_locations, inducing_locations)
-            + jax.vmap(jnp.diag)(jnp.exp(inducing_pseudo_log_err_stddev * 2)),
+            K,
             lower=True,
         )
         residual = self.prior(
             params.kernel_params, state.prior_state, inducing_locations
         ) + jnp.exp(inducing_pseudo_log_err_stddev) * jr.normal(k2, (S, OD, M))
+
         inducing_weights = (
             inducing_pseudo_mean
             - tf2jax.linalg.LinearOperatorLowerTriangular(cholesky).solvevec(
@@ -184,6 +188,35 @@ class SparseGaussianProcess:
         return SparseGaussianProcessState(
             state.inducing_weights, state.cholesky, prior_state
         )
+
+    @partial(jax.jit, static_argnums=(0,))
+    def set_inducing_points(
+        self,
+        params: SparseGaussianProcessParameters,
+        # state: SparseGaussianProcessState,
+        inducing_locations: jnp.ndarray,
+        inducing_means: jnp.ndarray,
+        inducing_err_stddev: jnp.ndarray,
+    ) -> SparseGaussianProcessParameters:
+        # reparametrised mean
+        K = self.kernel.matrix(
+            params.kernel_params, inducing_locations, inducing_locations
+        ) + jax.vmap(jnp.diag)(jnp.power(inducing_err_stddev, 2))
+
+        inducing_pseudo_mean = tf2jax.linalg.matvec(
+            tf2jax.linalg.inv(K), inducing_means
+        )
+
+        # regualr mean
+        # inducing_pseudo_mean = inducing_means
+
+        params = params._replace(
+            inducing_locations=inducing_locations,
+            inducing_pseudo_mean=inducing_pseudo_mean,
+            inducing_pseudo_log_err_stddev=jnp.log(inducing_err_stddev),
+        )
+
+        return params
 
     @partial(jax.jit, static_argnums=(0,))
     def prior_kl(
@@ -251,4 +284,5 @@ class SparseGaussianProcess:
         l = n_data * jnp.sum(jnp.log(s)) + c * jnp.sum(((y - f) / s) ** 2)
 
         r = self.hyperprior(params, state)
+
         return (kl + l + r, state)
