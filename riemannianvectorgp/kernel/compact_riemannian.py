@@ -107,3 +107,34 @@ class SquaredExponentialCompactRiemannianManifoldKernel(
     ) -> jnp.ndarray:
         lengthscale = jnp.exp(params.log_length_scale)
         return jnp.exp(-(jnp.power(lengthscale, 2) * eigenvalues / 2))
+
+
+class MaternCompactRiemannianManifoldKernelParams(NamedTuple):
+    log_length_scale: jnp.ndarray
+
+
+class MaternCompactRiemannianManifoldKernel(CompactRiemannianManifoldKernel):
+    def __init__(self, nu, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.nu = nu
+
+    def init_params(
+        self,
+        key: jnp.ndarray,
+    ) -> SquaredExponentialCompactRiemannianManifoldKernelParams:
+        log_length_scales = jnp.zeros((1))
+        return SquaredExponentialCompactRiemannianManifoldKernelParams(
+            log_length_scales
+        )
+
+    @partial(jit, static_argnums=(0,))
+    def spectrum(
+        self,
+        eigenvalues: jnp.ndarray,
+        params: NamedTuple,
+    ) -> jnp.ndarray:
+        lengthscale = jnp.exp(params.log_length_scale)
+        return jnp.power(
+            2 * self.nu / jnp.power(lengthscale, 2) + eigenvalues,
+            -self.nu - self.manifold.dimension / 2,
+        )
