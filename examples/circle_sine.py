@@ -200,6 +200,12 @@ plot(x[:, 0], y[0, :], gp.prior(params.kernel_params, state.prior_state, x)[:, 0
 # %%
 opt = optax.chain(optax.scale_by_adam(b1=0.9, b2=0.999, eps=1e-8), optax.scale(-0.01))
 opt_state = opt.init(params)
+
+# %% 
+debug_params = [params]
+debug_states = [state]
+debug_keys = [rng.key]
+
 # %%
 for i in range(400):
     ((train_loss, state), grads) = jax.value_and_grad(gp.loss, has_aux=True)(
@@ -212,6 +218,29 @@ for i in range(400):
         break 
     if i <= 10 or i % 20 == 0:
         print(i, "Loss:", train_loss)
+    debug_params.append(params)
+    debug_states.append(state)
+    debug_keys.append(rng.key)
+
+# %%
+
+plot_gp(x, y, gp, debug_params[-1], debug_states[-1], samples=True)
+
+# %%
+jax.value_and_grad(gp.loss, has_aux=True)(
+        debug_params[-1], debug_states[-1], debug_keys[-1], x, y, x.shape[0]
+    ) 
+
+# %%
+config.update("jax_debug_nans", True)
+
+# %%
+jax.grad(gp.loss, has_aux=True)(
+        debug_params[-1], debug_states[-1], debug_keys[-1], x, y, x.shape[0]
+    )
+
+# %% 
+debug_params[-1]
 
 # %%
 
