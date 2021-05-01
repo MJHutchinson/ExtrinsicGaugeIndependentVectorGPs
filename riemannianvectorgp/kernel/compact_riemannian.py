@@ -114,9 +114,9 @@ class MaternCompactRiemannianManifoldKernelParams(NamedTuple):
 
 
 class MaternCompactRiemannianManifoldKernel(CompactRiemannianManifoldKernel):
-    def __init__(self, nu, *args, **kwargs):
+    def __init__(self, smoothness, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.nu = nu
+        self.smoothness = smoothness
 
     def init_params(
         self,
@@ -135,6 +135,6 @@ class MaternCompactRiemannianManifoldKernel(CompactRiemannianManifoldKernel):
     ) -> jnp.ndarray:
         lengthscale = jnp.exp(params.log_length_scale)
         return jnp.power(
-            2 * self.nu / jnp.power(lengthscale, 2) + eigenvalues,
-            -self.nu - self.manifold.dimension / 2,
+            2 * self.smoothness / jnp.power(lengthscale, 2) + eigenvalues,
+            -self.smoothness - self.manifold.dimension / 2,
         )
