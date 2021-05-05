@@ -46,9 +46,12 @@ class CompactRiemannianManifoldKernel(AbstractKernel):
         fx2 = self.basis_functions(params, EigenBasisFunctionState(eigenindicies), x2)
         lam = self.manifold.laplacian_eigenvalue(eigenindicies)
         spectrum = self.spectrum(lam, params)
+
         return jnp.sum(
-            fx1[..., np.newaxis, :] * fx2[..., np.newaxis, :, :] * spectrum,
-            axis=-1,
+            fx1[..., np.newaxis, :, :, np.newaxis]
+            * fx2[..., np.newaxis, :, :, np.newaxis, :]
+            * spectrum[:, np.newaxis, np.newaxis],
+            axis=-3,
         )
 
     # static 3 as jnp.arange needs a static length
@@ -105,8 +108,8 @@ class SquaredExponentialCompactRiemannianManifoldKernel(
         eigenvalues: jnp.ndarray,
         params: NamedTuple,
     ) -> jnp.ndarray:
-        lengthscale = jnp.exp(params.log_length_scale)
-        return jnp.exp(-(jnp.power(lengthscale, 2) * eigenvalues / 2))
+        lengthscale2 = jnp.exp(2 * params.log_length_scale)
+        return jnp.exp(-(lengthscale2 * eigenvalues / 2))
 
 
 class MaternCompactRiemannianManifoldKernelParams(NamedTuple):
