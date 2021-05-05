@@ -224,11 +224,11 @@ plt.legend()
 plt.title(f"LS: {jnp.exp(kernel_params.sub_kernel_params.log_length_scale):0.3f}")
 # %%
 s1 = S1(1.0)
-# kernel = ScaledKernel(SquaredExponentialCompactRiemannianManifoldKernel(s1, 100))
-kernel = ScaledKernel(MaternCompactRiemannianManifoldKernel(1.5, s1, 100))
+kernel = ScaledKernel(SquaredExponentialCompactRiemannianManifoldKernel(s1, 100))
+# kernel = ScaledKernel(MaternCompactRiemannianManifoldKernel(1.5, s1, 100))
 kernel_params = kernel.init_params(next(rng))
 sub_kernel_params = kernel_params.sub_kernel_params
-sub_kernel_params = sub_kernel_params._replace(log_length_scale=jnp.log(0.5))
+sub_kernel_params = sub_kernel_params._replace(log_length_scale=jnp.log(0.01))
 kernel_params = kernel_params._replace(sub_kernel_params=sub_kernel_params)
 kernel_params = kernel_params._replace(
     log_amplitude=-jnp.log(kernel.matrix(kernel_params, x, x)[0, 0, 0])
@@ -240,7 +240,7 @@ plt.plot(x[:, 0], k[0, :, 0, 0], label="EQ")
 
 # %%
 rng = GlobalRNG()
-gp = SparseGaussianProcess(kernel, 1, 1, 11, 67, 17)
+gp = SparseGaussianProcess(kernel, 1, 1, 11, 67, 100)
 (params, state) = gp.init_params_with_state(next(rng))
 params = params._replace(kernel_params=kernel_params)
 
@@ -252,6 +252,7 @@ params
 # %%
 x_ind = jnp.expand_dims(jnp.linspace(0, 2 * jnp.pi, 11), -1)
 y_ind = 2 * jnp.sin(x_ind) + jr.normal(next(rng), x_ind.shape) / 10
+y_ind = jnp.zeros_like(x_ind)
 
 params = gp.set_inducing_points(params, x_ind, y_ind, jnp.ones_like(y_ind) * 0.01)
 
@@ -264,18 +265,11 @@ state = gp.randomize(params, state, next(rng))
 
 plot_gp(x, y, gp, params, state, samples=True)
 
-
-# %%
-state = gp.randomize(params, state, next(rng))
-
-plot_gp(x, y, gp, params, state, samples=False)
-print(gp.loss(params, state, next(rng), x, y, x.shape[0])[0])
-
 # %%
 opt = optax.chain(optax.scale_by_adam(b1=0.9, b2=0.999, eps=1e-8), optax.scale(-0.01))
 opt_state = opt.init(params)
 # %%
-for i in range(6000):
+for i in range(600):
     ((train_loss, state), grads) = jax.value_and_grad(gp.loss, has_aux=True)(
         params, state, next(rng), x, y, x.shape[0]
     )

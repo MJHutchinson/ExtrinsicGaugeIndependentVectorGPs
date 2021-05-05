@@ -186,7 +186,12 @@ class SparseGaussianProcess:
         )  # mean-reparameterized v = \mu + (K + V)^{-1}(-f - \eps)
 
         cholesky = rearrange(
-            K, "(M1 OD1) (M2 OD2) -> M1 M2 OD1 OD2", M1=M1, M2=M2, OD1=OD1, OD2=OD2
+            cholesky,
+            "(M1 OD1) (M2 OD2) -> M1 M2 OD1 OD2",
+            M1=M1,
+            M2=M2,
+            OD1=OD1,
+            OD2=OD2,
         )
         inducing_weights = rearrange(inducing_weights, "S (M OD) -> S M OD", M=M, OD=OD)
 
@@ -332,7 +337,7 @@ class SparseGaussianProcess:
 
         f = self(params, state, x)
         s = jnp.exp(params.log_error_stddev)
-        (n_samples, _, n_batch) = f.shape
+        (n_samples, n_batch, _) = f.shape
         c = n_data / (n_batch * n_samples * 2)
         l = n_data * jnp.sum(jnp.log(s)) + c * jnp.sum(((y - f) / s) ** 2)
 
