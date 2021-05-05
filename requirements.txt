@@ -1,5 +1,5 @@
-jax==0.2.*
+jax==0.2.11
 jaxlib==0.1.*
-tensorflow==2.4
-tensorflow_probability==0.*
-optax==0.0.*
+tensorflow==2.*
+tensorflow_probability==0.12.*
+optax==0.*

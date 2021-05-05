@@ -1,181 +1,75 @@
 from abc import ABC, ABCMeta, abstractmethod
 from typing import NamedTuple, Tuple
+import jax
 import jax.numpy as jnp
+import jax.scipy as jsp
 import numpy as np
 from jax import jit
 from functools import partial
 
-from .embedded_manifold import EmbeddedManifold
+from .manifold import AbstractRiemannianMainfold
+from .embedded_manifold import AbstractEmbeddedRiemannianManifold
 
 
-class ProductManifold(EmbeddedManifold):
-    def __init__(self, *submanifolds):
-        self.submanifolds = submanifolds
-        self.sub_dimensions = [sm.dimension for sm in self.submanifolds]
+class ProductManifold(AbstractRiemannianMainfold):
+    def __init__(self, *sub_manifolds):
+        self.dimension = sum([m.dimension for m in sub_manifolds])
+        self.sub_manifolds = sub_manifolds
+
+    @partial(jit, static_argnums=(0,))
+    def laplacian_eigenvalue(
+        self,
+        n: int,
+    ) -> jnp.ndarray:
+        pass
+
+    @partial(jit, static_argnums=(0,))
+    def laplacian_eigenfunction(
+        self,
+        n: int,
+        x: jnp.ndarray,
+    ) -> jnp.ndarray:
+        pass
+
+    def __repr__(
+        self,
+    ):
+        return "×".join([str(m) for m in self.sub_manifolds])
+
+
+class EmbeddedProductManifold(AbstractEmbeddedRiemannianManifold, ProductManifold):
+    def __init__(self, *sub_manifolds):
+        self.sub_manifolds = sub_manifolds
+        self.sub_dimensions = [sm.dimension for sm in self.sub_manifolds]
         self.dimension = sum(self.sub_dimensions)
-        self.sub_embedded_dimensions = [sm.embedded_dimension for sm in self.submanifolds]
+        self.sub_embedded_dimensions = [
+            sm.embedded_dimension for sm in self.sub_manifolds
+        ]
         self.embedded_dimension = sum(self.sub_embedded_dimensions)
 
-    @abstractmethod
+    @partial(jit, static_argnums=(0,))
     def m_to_e(self, M):
-        """Maps points from intrinsic coordinates to Euclidean coordinates
+        sub_M = jnp.split(M, self.sub_dimensions[:-1], axis=-1)
+        sub_X = [
+            self.sub_manifolds[i].m_to_e(sub_M[i])
+            for i in range(len(self.sub_manifolds))
+        ]
+        return jnp.concatenate(sub_X, axis=-1)
 
-        Parameters
-        ----------
-        M : jnp.array
-            array of intrinsic coordinates
-        """
-        coords = 
-
-    @abstractmethod
+    @partial(jit, static_argnums=(0,))
     def e_to_m(self, E):
-        """Maps points from Euclidean coordinates to intrinsic coordinates
+        sub_E = jnp.split(E, self.sub_dimensions[:-1], axis=-1)
+        sub_M = [
+            self.sub_manifolds[i].e_to_m(sub_E[i])
+            for i in range(len(self.sub_manifolds))
+        ]
+        return jnp.concatenate(sub_M, axis=-1)
 
-        Parameters
-        ----------
-        E : jnp.array
-        """
-        pass
-
-    @abstractmethod
+    @partial(jit, static_argnums=(0,))
     def projection_matrix(self, M):
-        """Matrix function that projects euclidean vectors into the tangent
-        space of the given point.
-
-        Implicitly encodes a choice of gauge.
-
-        Parameters
-        ----------
-        M : jnp.array
-        """
-        pass
-
-    @abstractmethod
-    def mesh(self, n_points):
-        """Generates an intrinsic coordinate mesh of the manifold with some
-        discretisation level.
-
-        Parameters
-        ----------
-        n_points : int.
-            discretisation level. Usually (n_points + 1)^d vertices
-        """
-        pass
-
-    def projection_matrix_to_3d(self, M):
-        """Projection matrix to project tangent space vectors to 3d vectors
-        for visualisation
-
-        Parameters
-        ----------
-        M : jnp.ndarray
-        """
-        raise NotImplementedError()
-
-    def m_to_3d(self, M):
-        """Projects intrinsic coordinates to 3D coordinates for visualisation
-
-        Parameters
-        ----------
-        M : jnp.ndarray
-        """
-        raise NotImplementedError()
-
-    def project_to_m(self, X, Y):
-        """Projects a set of Euclidean locations and vectors to the intrinsic
-        coordinates and tangent spaces.
-
-        Parameters
-        ----------
-        X : jnp.ndarray
-            Euclidean coordinates
-        Y : jnp.ndarray
-            Euclidean vectors
-
-        Returns
-        -------
-        M : jnp.ndarray
-            Intrinsic coordinates
-        V : jnp.ndarray
-            Tangent vectors in gauge defined by self.projection_matrix
-        """
-        M = self.e_to_m(X)
-        return M, (self.projection_matrix(M) @ Y[..., np.newaxis]).squeeze(-1)
-
-    def project_to_e(self, M, V):
-        """Projects a set of intrinsic coordinates and tangent vectors to
-        euclidean space.
-
-        Parameters
-        ----------
-        M : jnp.ndarray
-            Intrinsic coordinates
-        V : jnp.ndarray
-            Tangent vectors
-
-        Returns
-        -------
-        X : jnp.ndarray
-            Euclidean coordinates
-        Y : jnp.ndarray
-            Euclidean vectors
-        """
-        return (
-            self.m_to_e(M),
-            (
-                jnp.swapaxes(self.projection_matrix(M), -1, -2) @ V[..., np.newaxis]
-            ).squeeze(-1),
-        )
-
-    def rotate_points(self, M, V, R):
-        """Rotate a set of intrinsic coordinates and tangent vectors by a rotation R
-
-        Parameters
-        ----------
-        M : jnp.ndarray
-            Intrinsic coordinates
-        V : jnp.ndarry
-            Tangent vectors
-        R : jnp.ndarray
-            Rotation matrix
-
-        Returns
-        -------
-        M : jnp.ndarray
-            Intrinsic coordinates
-        V : jnp.ndarray
-            Tangent vectors in gauge defined by self.projection_matrix
-        """
-        X = self.m_to_e(M)
-        X_ = (R @ X[..., np.newaxis]).squeeze(-1)
-        M_ = self.e_to_m(X_)
-        vector_transport_map = (
-            self.projection_matrix(M_)
-            @ R
-            @ jnp.swapaxes(self.projection_matrix(M), -1, -2)
-        )
-        V_ = (vector_transport_map @ V[..., np.newaxis]).squeeze(-1)
-        return M_, V_
-
-    def project_to_3d(self, M, V):
-        """Projects intrinsic coordinates and tangent vectors to 3D for visualisation
-
-        Parameters
-        ----------
-        M : jnp.ndarray
-            Intrinsic coordinates
-        V : jnp.ndarray
-            Tanget vectors
-
-        Returns
-        -------
-        X : jnp.ndarray
-            3D coordinates
-        Y : jnp.ndarray
-            3D vectors
-        """
-        X = self.m_to_3d(M)
-        Y = (
-            jnp.swapaxes(self.projection_matrix_to_3d(M), -1, -2) @ V[..., np.newaxis]
-        ).squeeze()
-        return X, Y 
+        sub_M = jnp.split(M, self.sub_dimensions[:-1], axis=-1)
+        sub_projection_matricies = [
+            self.sub_manifolds[i].projection_matrix(sub_M[i])
+            for i in range(len(self.sub_manifolds))
+        ]
+        return jax.vmap(jsp.linalg.block_diag)(*sub_projection_matricies)

@@ -26,7 +26,7 @@ class GaussianProcessState(NamedTuple):
 
 
 class GaussianProcess:
-    """A sparse Gaussian process, implemented as a Haiku module."""
+    """A Gaussian process, implemented as a Haiku module."""
 
     def __init__(
         self,
@@ -35,7 +35,7 @@ class GaussianProcess:
         output_dimension: int,
         num_samples: int,
     ):
-        """Initializes the sparse GP.
+        """Initializes the GP.
 
         Args:
             kernel: the covariance kernel.

@@ -6,6 +6,7 @@ import jax.scipy as jsp
 from functools import partial
 import tensorflow_probability
 from tensorflow_probability.python.internal.backend import jax as tf2jax
+from einops import rearrange
 
 tfp = tensorflow_probability.experimental.substrates.jax
 tfk = tfp.math.psd_kernels
@@ -73,8 +74,8 @@ class SparseGaussianProcess:
         )
         log_error_stddev = jnp.zeros((OD))
         inducing_locations = jr.uniform(k2, (M, ID))
-        inducing_pseudo_mean = jnp.zeros((OD, M))
-        inducing_pseudo_log_err_stddev = jnp.zeros((OD, M))
+        inducing_pseudo_mean = jnp.zeros((M, OD))
+        inducing_pseudo_log_err_stddev = jnp.zeros((M, OD))
         params = SparseGaussianProcessParameters(
             log_error_stddev,
             inducing_locations,
@@ -83,8 +84,8 @@ class SparseGaussianProcess:
             kernel_params,
         )
 
-        inducing_weights = jnp.zeros((S, OD, M))
-        cholesky = jnp.zeros((OD, M, M))
+        inducing_weights = jnp.zeros((S, M, OD))
+        cholesky = jnp.zeros((M, M, OD, OD))
         prior_state = self.prior.init_state(params.kernel_params, self.num_samples, k3)
         state = SparseGaussianProcessState(inducing_weights, cholesky, prior_state)
 
@@ -114,9 +115,8 @@ class SparseGaussianProcess:
         prior_state = state.prior_state
 
         f_prior = self.prior(kernel_params, prior_state, x)
-        f_data = tf2jax.linalg.matvec(
-            self.kernel.matrix(kernel_params, x, inducing_locations), inducing_weights
-        )  # non-batched
+        K = self.kernel.matrix(kernel_params, x, inducing_locations)
+        f_data = jnp.einsum("mnop,snp->smo", K, inducing_weights)  # non-batched
 
         return f_prior + f_data
 
@@ -141,6 +141,11 @@ class SparseGaussianProcess:
         kernel_params = params.kernel_params
         prior_state = state.prior_state
 
+        inducing_pseudo_mean = rearrange(inducing_pseudo_mean, "M OD -> (M OD)")
+        inducing_pseudo_log_err_stddev = rearrange(
+            inducing_pseudo_log_err_stddev, "M OD -> (M OD)"
+        )
+
         (k1, k2) = jr.split(key)
         prior_state = self.prior.resample_weights(
             kernel_params, prior_state, self.num_samples, k1
@@ -149,17 +154,26 @@ class SparseGaussianProcess:
             state.inducing_weights, state.cholesky, prior_state
         )
 
-        K = self.kernel.matrix(
-            kernel_params, inducing_locations, inducing_locations
-        ) + jax.vmap(jnp.diag)(jnp.exp(inducing_pseudo_log_err_stddev * 2))
+        K = self.kernel.matrix(kernel_params, inducing_locations, inducing_locations)
+        M1, M2, OD1, OD2 = K.shape
+        K = rearrange(K, "M1 M2 OD1 OD2 -> (M1 OD1) (M2 OD2)")
+
+        inducing_noise_kernel = jnp.diag(jnp.exp(inducing_pseudo_log_err_stddev * 2))
+
+        K = K + inducing_noise_kernel
 
         (cholesky, _) = jsp.linalg.cho_factor(
             K,
             lower=True,
         )
-        residual = self.prior(
-            params.kernel_params, state.prior_state, inducing_locations
-        ) + jnp.exp(inducing_pseudo_log_err_stddev) * jr.normal(k2, (S, OD, M))
+
+        prior = self.prior(params.kernel_params, state.prior_state, inducing_locations)
+        prior = rearrange(prior, "S M OD -> S (M OD)")
+        noise_cholesky = jnp.diag(jnp.exp(inducing_pseudo_log_err_stddev))
+        sample_noise = jnp.einsum(
+            "ij,sj->si", noise_cholesky, jr.normal(k2, (S, M * OD))
+        )
+        residual = prior + sample_noise
 
         inducing_weights = (
             inducing_pseudo_mean
@@ -170,6 +184,16 @@ class SparseGaussianProcess:
                 adjoint=True,
             )
         )  # mean-reparameterized v = \mu + (K + V)^{-1}(-f - \eps)
+
+        cholesky = rearrange(
+            cholesky,
+            "(M1 OD1) (M2 OD2) -> M1 M2 OD1 OD2",
+            M1=M1,
+            M2=M2,
+            OD1=OD1,
+            OD2=OD2,
+        )
+        inducing_weights = rearrange(inducing_weights, "S (M OD) -> S M OD", M=M, OD=OD)
 
         return SparseGaussianProcessState(inducing_weights, cholesky, prior_state)
 
@@ -199,16 +223,45 @@ class SparseGaussianProcess:
         inducing_err_stddev: jnp.ndarray,
     ) -> SparseGaussianProcessParameters:
         # reparametrised mean
+
+        M, OD = inducing_means.shape
+
+        inducing_means = rearrange(inducing_means, "M OD -> (M OD)")
+        inducing_err_stddev = rearrange(inducing_err_stddev, "M OD -> (M OD)")
+
         K = self.kernel.matrix(
             params.kernel_params, inducing_locations, inducing_locations
-        ) + jax.vmap(jnp.diag)(jnp.power(inducing_err_stddev, 2))
+        )
+        K = rearrange(K, "M1 M2 OD1 OD2 -> (M1 OD1) (M2 OD2)")
+
+        inducing_noise_kernel = jnp.diag(jnp.power(inducing_err_stddev, 2))
+
+        K = K + inducing_noise_kernel
 
         inducing_pseudo_mean = tf2jax.linalg.matvec(
             tf2jax.linalg.inv(K), inducing_means
         )
 
-        # regualr mean
-        # inducing_pseudo_mean = inducing_means
+        # TODO: is this faster? gives the right answer
+        # (cholesky, _) = jsp.linalg.cho_factor(
+        #     K,
+        #     lower=True,
+        # )
+        # inducing_pseudo_mean = tf2jax.linalg.LinearOperatorLowerTriangular(
+        #     cholesky
+        # ).solvevec(
+        #     tf2jax.linalg.LinearOperatorLowerTriangular(cholesky).solvevec(
+        #         inducing_means
+        #     ),
+        #     adjoint=True,
+        # )
+
+        inducing_pseudo_mean = rearrange(
+            inducing_pseudo_mean, "(M OD) -> M OD", M=M, OD=OD
+        )
+        inducing_err_stddev = rearrange(
+            inducing_err_stddev, "(M OD) -> M OD", M=M, OD=OD
+        )
 
         params = params._replace(
             inducing_locations=inducing_locations,
@@ -232,21 +285,26 @@ class SparseGaussianProcess:
         kernel_params = params.kernel_params
         cholesky = state.cholesky
 
-        logdet_term = 2 * jnp.sum(jnp.log(jax.vmap(jnp.diag)(cholesky))) - 2 * jnp.sum(
+        cholesky = rearrange(cholesky, "M1 M2 OD1 OD2 -> (M1 OD1) (M2 OD2)")
+        inducing_pseudo_mean = rearrange(inducing_pseudo_mean, "M OD -> (M OD)")
+        inducing_pseudo_log_err_stddev = rearrange(
+            inducing_pseudo_log_err_stddev, "M OD -> (M OD)"
+        )
+
+        logdet_term = 2 * jnp.sum(jnp.log(jnp.diag(cholesky))) - 2 * jnp.sum(
             inducing_pseudo_log_err_stddev
         )
-        kernel_matrix = self.kernel.matrix(
-            kernel_params, inducing_locations, inducing_locations
-        )
+        K = self.kernel.matrix(kernel_params, inducing_locations, inducing_locations)
+        K = rearrange(K, "M1 M2 OD1 OD2 -> (M1 OD1) (M2 OD2)")
         cholesky_inv = tf2jax.linalg.LinearOperatorLowerTriangular(cholesky).solve(
             tf2jax.linalg.LinearOperatorLowerTriangular(cholesky).solve(jnp.eye(M)),
             adjoint=True,
         )
-        trace_term = jnp.sum(cholesky_inv * kernel_matrix)
-        reparameterized_quadratic_form_term = jnp.sum(
-            inducing_pseudo_mean
-            * tf2jax.linalg.matvec(kernel_matrix, inducing_pseudo_mean)
+        trace_term = jnp.sum(cholesky_inv * K)
+        reparameterized_quadratic_form_term = jnp.einsum(
+            "i,ij,j", inducing_pseudo_mean, K, inducing_pseudo_mean
         )
+
         return (
             logdet_term
             - (OD * ID * M)
@@ -279,7 +337,7 @@ class SparseGaussianProcess:
 
         f = self(params, state, x)
         s = jnp.exp(params.log_error_stddev)
-        (n_samples, _, n_batch) = f.shape
+        (n_samples, n_batch, _) = f.shape
         c = n_data / (n_batch * n_samples * 2)
         l = n_data * jnp.sum(jnp.log(s)) + c * jnp.sum(((y - f) / s) ** 2)
 

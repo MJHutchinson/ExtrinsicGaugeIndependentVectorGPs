@@ -1,4 +1,7 @@
+from functools import partial
+
 import numpy as np
+from jax import jit
 import jax.numpy as jnp
 
 from .manifold import AbstractRiemannianMainfold
@@ -14,24 +17,30 @@ class S1(AbstractRiemannianMainfold):
     ):
         self.radius = radius
 
+    @partial(jit, static_argnums=(0,))
     def laplacian_eigenvalue(
         self,
         n: int,
     ) -> jnp.ndarray:
-        freq = (n + 2) // 4
-        return jnp.power(2 * jnp.pi * freq / self.radius, 2)
+        freq = n // 2
+        return jnp.power(2 * jnp.pi * freq * self.radius, 2)
 
+    @partial(jit, static_argnums=(0,))
     def laplacian_eigenfunction(
         self,
         n: int,
         x: jnp.ndarray,
     ) -> jnp.ndarray:
-        n = n + 2
-        freq = n // 4
-        phase = (jnp.pi / 2) * (n % 2)
-        neg = -((((n // 2) + 1) % 2) * 2 - 1)
-        phase = phase * neg
-        return jnp.cos(x * freq + phase)[..., np.newaxis, :, :]
+        freq = n // 2
+        phase = -(jnp.pi / 2) * (n % 2)
+        # neg = -((((n // 2) + 1) % 2) * 2 - 1)
+        # phase = phase * neg
+        return jnp.sqrt(2) * jnp.expand_dims(jnp.cos(x * freq + phase), -1)
+
+    def __repr__(
+        self,
+    ):
+        return f"S1({self.radius})"
 
 
 class EmbeddedS1(AbstractEmbeddedRiemannianManifold, S1):
@@ -43,11 +52,16 @@ class EmbeddedS1(AbstractEmbeddedRiemannianManifold, S1):
     ):
         super().__init__(radius)
 
+    @partial(jit, static_argnums=(0,))
     def m_to_e(self, M):
-        pass
+        return self.radius * jnp.concatenate([jnp.sin(M), jnp.cos(M)], axis=-1)
 
+    @partial(jit, static_argnums=(0,))
     def e_to_m(self, E):
-        pass
+        return (
+            jnp.arctan2(E[..., 0] / self.radius, E[..., 1] / self.radius) % (2 * jnp.pi)
+        )[..., np.newaxis]
 
+    @partial(jit, static_argnums=(0,))
     def projection_matrix(self, M):
-        pass
+        return jnp.stack([jnp.cos(M), -jnp.sin(M)], axis=-2)
