@@ -1,6 +1,7 @@
 from abc import ABC, ABCMeta, abstractmethod
 from typing import NamedTuple, Tuple
 import jax.numpy as jnp
+from tensorflow_probability.python.internal.backend import jax as tf2jax
 import numpy as np
 
 from .manifold import AbstractRiemannianMainfold
@@ -34,8 +35,8 @@ class AbstractEmbeddedRiemannianManifold(AbstractRiemannianMainfold):
 
     @abstractmethod
     def projection_matrix(self, M):
-        """Matrix function that projects euclidean vectors into the tangent
-        space of the given point.
+        """Matrix function that projects intrinsic tangent vectors into
+        the ambient Euclidean space.
 
         Implicitly encodes a choice of gauge.
 
@@ -94,7 +95,9 @@ class AbstractEmbeddedRiemannianManifold(AbstractRiemannianMainfold):
             Tangent vectors in gauge defined by self.projection_matrix
         """
         M = self.e_to_m(X)
-        return M, (self.projection_matrix(M) @ Y[..., np.newaxis]).squeeze(-1)
+        return M, tf2jax.linalg.matvec(
+            jnp.swapaxes(self.projection_matrix(M), -1, -2), Y
+        )
 
     def project_to_e(self, M, V):
         """Projects a set of intrinsic coordinates and tangent vectors to
@@ -116,9 +119,7 @@ class AbstractEmbeddedRiemannianManifold(AbstractRiemannianMainfold):
         """
         return (
             self.m_to_e(M),
-            (
-                jnp.swapaxes(self.projection_matrix(M), -1, -2) @ V[..., np.newaxis]
-            ).squeeze(-1),
+            tf2jax.linalg.matvec(self.projection_matrix(M), V),
         )
 
     def rotate_points(self, M, V, R):
@@ -173,3 +174,8 @@ class AbstractEmbeddedRiemannianManifold(AbstractRiemannianMainfold):
             jnp.swapaxes(self.projection_matrix_to_3d(M), -1, -2) @ V[..., np.newaxis]
         ).squeeze()
         return X, Y
+
+    # def __repr__(
+    #     self,
+    # ):
+    #     return self.__class__.__bases__[-1].__name__
