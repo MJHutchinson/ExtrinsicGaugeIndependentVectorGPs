@@ -35,6 +35,9 @@ class S1(AbstractRiemannianMainfold):
         phase = -(jnp.pi / 2) * (n % 2)
         # neg = -((((n // 2) + 1) % 2) * 2 - 1)
         # phase = phase * neg
+        # print(f"{x.shape=}")
+        # print(f"{freq.shape=}")
+        # print(f"{phase.shape=}")
         return jnp.sqrt(2) * jnp.expand_dims(jnp.cos(x * freq + phase), -1)
 
     def __repr__(
