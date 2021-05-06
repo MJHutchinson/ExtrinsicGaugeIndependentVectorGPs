@@ -34,9 +34,9 @@ class HamiltonianSystem(DynamicalSystem):
         states: jnp.ndarray
         ):
         (position, momentum) = jnp.split(states, 2, axis=-1)
-        momentum = momentum - self.step_size/2 * jax.grad(self.hamiltonian, argnums=0)(position, momentum)
-        position = position + self.step_size * jax.grad(self.hamiltonian, argnums=1)(position, momentum)
-        momentum = momentum - self.step_size/2 * jax.grad(self.hamiltonian, argnums=0)(position, momentum)
+        momentum = momentum - self.step_size/2 * jnp.vectorize(jax.grad(self.hamiltonian, argnums=0), signature = "(n),(n)->(n)")(position, momentum)
+        position = position + self.step_size * jnp.vectorize(jax.grad(self.hamiltonian, argnums=1), signature = "(n),(n)->(n)")(position, momentum)
+        momentum = momentum - self.step_size/2 * jnp.vectorize(jax.grad(self.hamiltonian, argnums=0), signature = "(n),(n)->(n)")(position, momentum)
         return jnp.concatenate((position, momentum), axis=-1)
 
 class PendulumSystem(HamiltonianSystem):
