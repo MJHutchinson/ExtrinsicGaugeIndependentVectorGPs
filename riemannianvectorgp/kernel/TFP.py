@@ -43,7 +43,10 @@ class TFPKernel(AbstractKernel):
         self,
         key: jnp.ndarray,
     ) -> TFPKernelParameters:
-        log_length_scales = jnp.zeros((self.input_dimension))
+        if self.input_dimension == 1:
+            log_length_scales = jnp.zeros(())
+        else:
+            log_length_scales = jnp.zeros((self.input_dimension))
         return TFPKernelParameters(log_length_scales)
 
     @partial(jit, static_argnums=(0,))
@@ -61,7 +64,7 @@ class TFPKernel(AbstractKernel):
         """
         length_scales = jnp.exp(params.log_length_scales)
         tfp_kernel = self.tfp_class(amplitude=None, length_scale=length_scales)
-        return tfp_kernel.matrix(x1, x2)
+        return tfp_kernel.matrix(x1, x2)[..., np.newaxis, np.newaxis]
 
     def sample_fourier_features(
         self,
@@ -72,12 +75,27 @@ class TFPKernel(AbstractKernel):
         (k1, k2) = jr.split(key)
         if self.tfp_class == tfk.ExponentiatedQuadratic:
             frequency = jr.normal(
-                k1, (self.output_dimension, self.input_dimension, num_samples)
+                k1,
+                (
+                    num_samples,
+                    self.output_dimension,
+                    self.input_dimension,
+                ),
             )
-            phase = 2 * jnp.pi * jr.uniform(k2, (self.output_dimension, num_samples))
+            phase = (
+                2
+                * jnp.pi
+                * jr.uniform(
+                    k2,
+                    (
+                        num_samples,
+                        self.output_dimension,
+                    ),
+                )
+            )
         else:
             raise NotImplementedError(
-                f"Fourier features not implemented for {self.kernel}"
+                f"Fourier features not implemented for {self.tfp_class}"
             )
         return RandomBasisFunctionState(frequency, phase)
 
@@ -86,7 +104,7 @@ class TFPKernel(AbstractKernel):
         params: NamedTuple,
         state: NamedTuple,
     ) -> jnp.ndarray:
-        L = state.frequency.shape[-1]
+        L = state.frequency.shape[-3]
         return jnp.ones((L))
 
     def basis_functions(
@@ -101,10 +119,17 @@ class TFPKernel(AbstractKernel):
         frequency = state.frequency
         phase = state.phase
 
-        L = frequency.shape[-1]
+        L = frequency.shape[0]
+
+        # print(frequency.shape)
+        # print(phase.shape)
+        # print(x.shape)
 
         rescaled_x = x / length_scales
         basis_fn = jnp.sqrt(2 / L) * jnp.cos(
-            rescaled_x @ frequency + jnp.expand_dims(phase, -2)
+            jnp.einsum("ni,boi->nbo", rescaled_x, frequency) + phase
         )
+        # print(frequency.shape)
+        # print(phase.shape)
+        # print(basis_fn.shape)
         return basis_fn
