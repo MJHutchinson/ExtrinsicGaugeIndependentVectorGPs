@@ -3,6 +3,7 @@ from typing import NamedTuple, Tuple
 import jax.numpy as jnp
 from tensorflow_probability.python.internal.backend import jax as tf2jax
 import numpy as np
+import jax
 from jax import jit
 import jax.numpy as jnp
 import jax.scipy as jsp
