@@ -13,6 +13,8 @@ tfk = tfp.math.psd_kernels
 from abc import ABC, abstractmethod
 from .kernel import AbstractKernel, FourierFeatures
 
+from einops import rearrange
+
 
 class GaussianProcessParameters(NamedTuple):
     kernel_params: NamedTuple
@@ -31,9 +33,6 @@ class GaussianProcess:
     def __init__(
         self,
         kernel: AbstractKernel,
-        input_dimension: int,
-        output_dimension: int,
-        num_samples: int,
     ):
         """Initializes the GP.
 
@@ -44,9 +43,8 @@ class GaussianProcess:
             num_samples: the number of samples stored in the GP.
         """
         self.kernel = kernel
-        self.input_dimension = input_dimension
-        self.output_dimension = output_dimension
-        self.num_samples = num_samples
+        self.input_dimension = kernel.input_dimension
+        self.output_dimension = kernel.output_dimension
 
     def init_params_with_state(
         self,
@@ -55,8 +53,7 @@ class GaussianProcess:
         (k1, k2) = jr.split(key)
         kernel_params = self.kernel.init_params(k1)
 
-        (S, OD, ID) = (
-            self.num_samples,
+        (OD, ID) = (
             self.output_dimension,
             self.input_dimension,
         )
@@ -79,18 +76,31 @@ class GaussianProcess:
         locations: jnp.ndarray,
         values: jnp.ndarray,
         noises: jnp.ndarray,
-        key: jnp.ndarray,
     ):
-        (S, OD, ID, N) = (
-            self.num_samples,
+        (OD, N) = (
             self.output_dimension,
-            self.input_dimension,
             locations.shape[0],
         )
-        K = self.kernel.matrix(params.kernel_params, locations, locations) + jnp.diag(
-            noises
+        noises_ = rearrange(noises, "N OD -> (N OD)")
+
+        K = self.kernel.matrix(params.kernel_params, locations, locations)
+        K = rearrange(K, "N1 N2 OD1 OD2 -> (N1 OD1) (N2 OD2)")
+        K = K + jnp.diag(noises_)
+        (cholesky, _) = jsp.linalg.cho_factor(
+            K,
+            lower=True,
         )
-        K_inv = tf2jax.linalg.inv(K)
+        K_inv = tf2jax.linalg.LinearOperatorLowerTriangular(cholesky).solve(
+            tf2jax.linalg.LinearOperatorLowerTriangular(cholesky).solve(
+                jnp.eye(N * OD)
+            ),
+            adjoint=True,
+        )
+        # K_inv = tf2jax.linalg.inv(K)
+        K_inv = rearrange(
+            K_inv, "(N1 OD1) (N2 OD2) -> N1 N2 OD1 OD2", N1=N, N2=N, OD1=OD, OD2=OD
+        )
+
         return GaussianProcessState(locations, values, noises, K_inv)
 
     @partial(jax.jit, static_argnums=(0,))
@@ -105,39 +115,59 @@ class GaussianProcess:
         Args:
             x: the input matrix.
         """
-        (S, OD, ID, M) = (
-            self.num_samples,
+        (OD, ID, M) = (
             self.output_dimension,
             self.input_dimension,
             x.shape[0],
         )
-        K_inv = state.K_inv
+        K_inv = rearrange(state.K_inv, "M1 M2 OD1 OD2 -> (M1 OD1) (M2 OD2)")
+        values = rearrange(state.values, "M OD -> (M OD)")
         kernel_params = params.kernel_params
 
         K_sn = self.kernel.matrix(kernel_params, x, state.locations)
         K_ns = self.kernel.matrix(kernel_params, state.locations, x)
         K_ss = self.kernel.matrix(kernel_params, x, x)
 
-        m = tf2jax.linalg.matvec(K_sn, tf2jax.linalg.matvec(K_inv, state.values))
+        K_sn = rearrange(K_sn, "M1 M2 OD1 OD2 -> (M1 OD1) (M2 OD2)")
+        K_ns = rearrange(K_ns, "M1 M2 OD1 OD2 -> (M1 OD1) (M2 OD2)")
+        K_ss = rearrange(K_ss, "M1 M2 OD1 OD2 -> (M1 OD1) (M2 OD2)")
+
+        # print(f"{K_inv.shape=}")
+        # print(f"{K_sn.shape=}")
+        # print(f"{K_ns.shape=}")
+        # print(f"{K_ss.shape=}")
+        m = tf2jax.linalg.matvec(K_sn, tf2jax.linalg.matvec(K_inv, values))
         K = K_ss - tf2jax.linalg.matmul(tf2jax.linalg.matmul(K_sn, K_inv), K_ns)
+
+        m = rearrange(m, "(M OD) -> M OD", M=M, OD=OD)
+        K = rearrange(
+            K, "(M1 OD1) (M2 OD2) -> M1 M2 OD1 OD2", M1=M, M2=M, OD1=OD, OD2=OD
+        )
 
         return m, K
 
+    @partial(jax.jit, static_argnums=(0, 4))
     def sample(
         self,
         params: GaussianProcessParameters,
         state: GaussianProcessState,
         x: jnp.ndarray,
+        num_samples: int,
         key: jnp.ndarray,
         obs_noise: float = 1e-6,
     ) -> jnp.ndarray:
         m, K = self(params, state, x)
+        M, OD = m.shape
+        m = rearrange(m, "M OD -> (M OD)")
+        K = rearrange(K, "M1 M2 OD1 OD2 -> (M1 OD1) (M2 OD2)")
         cholesky = jsp.linalg.cho_factor(
-            K + jnp.identity(K.shape[-1]) * obs_noise, lower=True
+            K + jnp.identity(M * OD) * obs_noise, lower=True
         )[0]
-        (S, N) = self.num_samples, x.shape[0]
-        sample_noise = jr.normal(key, (S, N))
-        return m + tf2jax.linalg.matvec(cholesky, sample_noise)[:, np.newaxis, :]
+        S = num_samples
+        sample_noise = jr.normal(key, (S, M * OD))
+        samples = m + tf2jax.linalg.matvec(cholesky, sample_noise)
+        samples = rearrange(samples, "S (M OD) -> S M OD", M=M, OD=OD)
+        return samples
 
     # @partial(jax.jit, static_argnums=(0,))
     # def randomize(
