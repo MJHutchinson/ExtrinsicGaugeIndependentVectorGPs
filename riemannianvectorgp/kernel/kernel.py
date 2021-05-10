@@ -139,7 +139,7 @@ class FourierFeatures:
         )
         weights = state.weights
         return jnp.einsum(
-            "mlo,sl->smo", basis_functions, weights
+            "mloe,sle->smo", basis_functions, weights
         )  # tf2jax.linalg.matvec(basis_functions, weights)
 
 

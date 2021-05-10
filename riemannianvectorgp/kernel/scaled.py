@@ -25,6 +25,8 @@ class ScaledKernel(AbstractKernel):
         sub_kernel: AbstractKernel,
     ):
         self.sub_kernel = sub_kernel
+        self.input_dimension = sub_kernel.input_dimension
+        self.output_dimension = sub_kernel.output_dimension
 
     def init_params(
         self,
@@ -35,6 +37,7 @@ class ScaledKernel(AbstractKernel):
 
         return ScaledKernelParams(log_amplitudes, sub_kernel_params)
 
+    @partial(jit, static_argnums=(0,))
     def matrix(
         self,
         params: NamedTuple,
@@ -45,6 +48,7 @@ class ScaledKernel(AbstractKernel):
         amplitude = jnp.exp(params.log_amplitude)
         return amplitude * sub_k
 
+    @partial(jit, static_argnums=(0, 3))
     def sample_fourier_features(
         self,
         params: NamedTuple,
@@ -55,6 +59,7 @@ class ScaledKernel(AbstractKernel):
             params.sub_kernel_params, key, num_samples
         )
 
+    @partial(jit, static_argnums=(0,))
     def weight_variance(
         self,
         params: NamedTuple,
@@ -62,6 +67,7 @@ class ScaledKernel(AbstractKernel):
     ) -> jnp.ndarray:
         return self.sub_kernel.weight_variance(params.sub_kernel_params, state)
 
+    @partial(jit, static_argnums=(0,))
     def basis_functions(
         self,
         params: NamedTuple,

@@ -66,6 +66,7 @@ class TFPKernel(AbstractKernel):
         tfp_kernel = self.tfp_class(amplitude=None, length_scale=length_scales)
         return tfp_kernel.matrix(x1, x2)[..., np.newaxis, np.newaxis]
 
+    @partial(jit, static_argnums=(0, 3))
     def sample_fourier_features(
         self,
         params: NamedTuple,
@@ -99,14 +100,16 @@ class TFPKernel(AbstractKernel):
             )
         return RandomBasisFunctionState(frequency, phase)
 
+    @partial(jit, static_argnums=(0,))
     def weight_variance(
         self,
         params: NamedTuple,
         state: NamedTuple,
     ) -> jnp.ndarray:
         L = state.frequency.shape[-3]
-        return jnp.ones((L))
+        return jnp.ones((L))[..., np.newaxis]
 
+    @partial(jit, static_argnums=(0,))
     def basis_functions(
         self,
         params: NamedTuple,
@@ -132,4 +135,4 @@ class TFPKernel(AbstractKernel):
         # print(frequency.shape)
         # print(phase.shape)
         # print(basis_fn.shape)
-        return basis_fn
+        return basis_fn[..., np.newaxis]
