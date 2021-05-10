@@ -34,8 +34,6 @@ class SparseGaussianProcess:
     def __init__(
         self,
         kernel: AbstractKernel,
-        input_dimension: int,
-        output_dimension: int,
         num_inducing: int,
         num_basis: int,
         num_samples: int,
@@ -52,8 +50,8 @@ class SparseGaussianProcess:
         """
         self.kernel = kernel
         self.prior = FourierFeatures(kernel, num_basis)
-        self.input_dimension = input_dimension
-        self.output_dimension = output_dimension
+        self.input_dimension = kernel.input_dimension
+        self.output_dimension = kernel.output_dimension
         self.num_inducing = num_inducing
         self.num_basis = num_basis
         self.num_samples = num_samples
@@ -270,6 +268,39 @@ class SparseGaussianProcess:
         )
 
         return params
+
+    @partial(jax.jit, static_argnums=(0,))
+    def get_inducing_mean(
+        self,
+        params: SparseGaussianProcessParameters,
+        state: SparseGaussianProcessState,
+    ) -> jnp.ndarray:
+
+        inducing_locations = params.inducing_locations
+        inducing_pseudo_mean = params.inducing_pseudo_mean
+        inducing_pseudo_log_err_stddev = params.inducing_pseudo_log_err_stddev
+
+        M, OD = inducing_pseudo_mean.shape
+
+        inducing_pseudo_mean = rearrange(inducing_pseudo_mean, "M OD -> (M OD)")
+        inducing_err_stddev = jnp.exp(
+            rearrange(inducing_pseudo_log_err_stddev, "M OD -> (M OD)")
+        )
+
+        K = self.kernel.matrix(
+            params.kernel_params, inducing_locations, inducing_locations
+        )
+        K = rearrange(K, "M1 M2 OD1 OD2 -> (M1 OD1) (M2 OD2)")
+
+        inducing_noise_kernel = jnp.diag(jnp.power(inducing_err_stddev, 2))
+
+        K = K + inducing_noise_kernel
+
+        inducing_mean = tf2jax.linalg.matvec(K, inducing_pseudo_mean)
+
+        inducing_mean = rearrange(inducing_mean, "(M OD) -> M OD", M=M, OD=OD)
+
+        return inducing_mean
 
     @partial(jax.jit, static_argnums=(0,))
     def prior_kl(
