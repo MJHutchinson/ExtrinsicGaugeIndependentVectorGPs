@@ -107,7 +107,7 @@ class TFPKernel(AbstractKernel):
         state: NamedTuple,
     ) -> jnp.ndarray:
         L = state.frequency.shape[-3]
-        return jnp.ones((L))
+        return jnp.ones((L))[..., np.newaxis]
 
     @partial(jit, static_argnums=(0,))
     def basis_functions(
@@ -135,4 +135,4 @@ class TFPKernel(AbstractKernel):
         # print(frequency.shape)
         # print(phase.shape)
         # print(basis_fn.shape)
-        return basis_fn
+        return basis_fn[..., np.newaxis]

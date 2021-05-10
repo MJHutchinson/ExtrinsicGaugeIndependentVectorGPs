@@ -48,8 +48,8 @@ class CompactRiemannianManifoldKernel(AbstractKernel):
         spectrum = self.spectrum(lam, params)
 
         return jnp.sum(
-            fx1[..., np.newaxis, :, :, np.newaxis]
-            * fx2[..., np.newaxis, :, :, np.newaxis, :]
+            fx1[..., np.newaxis, :, :, :]
+            * fx2[..., np.newaxis, :, :, :, :]
             * spectrum[:, np.newaxis, np.newaxis],
             axis=-3,
         )
@@ -71,7 +71,7 @@ class CompactRiemannianManifoldKernel(AbstractKernel):
         state: NamedTuple,
     ) -> jnp.ndarray:
         lam = self.manifold.laplacian_eigenvalue(state.eigenindicies)
-        return self.spectrum(lam, params)
+        return self.spectrum(lam, params)[..., np.newaxis]
 
     @partial(jit, static_argnums=(0,))
     def basis_functions(
@@ -80,7 +80,9 @@ class CompactRiemannianManifoldKernel(AbstractKernel):
         state: NamedTuple,
         x: jnp.ndarray,
     ) -> jnp.ndarray:
-        return self.manifold.laplacian_eigenfunction(state.eigenindicies, x)
+        return self.manifold.laplacian_eigenfunction(state.eigenindicies, x)[
+            ..., np.newaxis
+        ]
 
 
 class SquaredExponentialCompactRiemannianManifoldKernelParams(NamedTuple):

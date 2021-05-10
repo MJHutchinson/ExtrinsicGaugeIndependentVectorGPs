@@ -52,17 +52,17 @@ class ManifoldProjectionVectorKernel(AbstractKernel):
         p2 = self.manifold.projection_matrix(x2)
 
         if self.euclidean_vector_kernel.output_dimension == 1:
-            print(f"{p1.shape=}")
-            print(f"{p2.shape=}")
-            print(f"{jnp.eye(self.manifold.embedded_dimension).shape=}")
+            # print(f"{p1.shape=}")
+            # print(f"{p2.shape=}")
+            # print(f"{jnp.eye(self.manifold.embedded_dimension).shape=}")
             tangent_projection = jnp.einsum(
-                "...iem,ef,...jfn->...jinm",
+                "...iem,ef,...jfn->...ijmn",
                 p1,
                 jnp.eye(self.manifold.embedded_dimension),
                 p2,
             )
-            print(f"{tangent_projection.shape=}")
-            print(f"{Ke.shape=}")
+            # print(f"{tangent_projection.shape=}")
+            # print(f"{Ke.shape=}")
             K = Ke * tangent_projection
         else:
             K = jnp.einsum("...iem,...ijef,...jfn->...jinm", p1, Ke, p2)
@@ -86,7 +86,11 @@ class ManifoldProjectionVectorKernel(AbstractKernel):
         params: NamedTuple,
         state: NamedTuple,
     ) -> jnp.ndarray:
-        return self.euclidean_vector_kernel.weight_variance(params, state)
+        return jnp.repeat(
+            self.euclidean_vector_kernel.weight_variance(params, state),
+            self.manifold.embedded_dimension,
+            axis=-1,
+        )
 
     @partial(jit, static_argnums=(0,))
     def basis_functions(
@@ -97,4 +101,6 @@ class ManifoldProjectionVectorKernel(AbstractKernel):
     ) -> jnp.ndarray:
         basis_functions = self.euclidean_vector_kernel.basis_functions(params, state, x)
         p = self.manifold.projection_matrix(x)
-        return jnp.einsum("...neo,...nse->...nso", basis_functions, p)
+        print(basis_functions.shape)
+        print(p.shape)
+        return jnp.einsum("...nbem,...nem->...nbme", basis_functions, p)
