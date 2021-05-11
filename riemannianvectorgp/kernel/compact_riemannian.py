@@ -8,14 +8,14 @@ from functools import partial
 import tensorflow_probability
 
 from riemannianvectorgp.manifold import AbstractRiemannianMainfold
-from .kernel import AbstractKernel, EigenBasisFunctionState
+from .kernel import AbstractKLKernel, EigenBasisFunctionState
 from .utils import pairwise_dimension_distance
 
 tfp = tensorflow_probability.experimental.substrates.jax
 tfk = tfp.math.psd_kernels
 
 
-class CompactRiemannianManifoldKernel(AbstractKernel):
+class CompactRiemannianManifoldKernel(AbstractKLKernel):
     def __init__(
         self,
         compact_riemannian_manifold: AbstractRiemannianMainfold,
