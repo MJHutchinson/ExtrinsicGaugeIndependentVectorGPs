@@ -19,8 +19,19 @@ from IPython.display import set_matplotlib_formats
 set_matplotlib_formats("svg")
 import sys
 
-from riemannianvectorgp.manifold import S1, EmbeddedS1, ProductManifold, EmbeddedProductManifold
-from riemannianvectorgp.kernel import ScaledKernel, ManifoldProjectionVectorKernel, MaternCompactRiemannianManifoldKernel, SquaredExponentialCompactRiemannianManifoldKernel
+from riemannianvectorgp.manifold import (
+    S1,
+    EmbeddedS1,
+    ProductManifold,
+    EmbeddedProductManifold,
+)
+from riemannianvectorgp.kernel import (
+    ScaledKernel,
+    ManifoldProjectionVectorKernel,
+    MaternCompactRiemannianManifoldKernel,
+    SquaredExponentialCompactRiemannianManifoldKernel,
+)
+from riemannianvectorgp.sparse_gp import SparseGaussianProcess
 from jax.config import config
 
 # config.update("jax_debug_nans", True)
@@ -126,32 +137,6 @@ tp =  jnp.einsum("...iem,...jfn->...jinm", p1, p2)
 plt.plot(x[:,0]*(1 + tp[0, :, 0, 0]), x[:,1]*(1 + tp[0, :, 0, 0]))
 # %%
 
-m_, v_ = s1.project_to_m(x, y)
-
-print(jnp.mean(m - m_), jnp.mean(v - v_))
-# %%
-
-M = jnp.concatenate([m,m], axis=-1)
-jnp.split(M, [1], axis=-1)
-# %%
-
-s_2 = EmbeddedProductManifold(EmbeddedS1(0.5), EmbeddedS1(0.5))
-
-
-# %%
-m = jnp.linspace(0, jnp.pi*2, 30) % (2 * jnp.pi)
-m = jnp.meshgrid(m,m)
-m = jnp.stack([m_.flatten() for m_ in m], axis=-1)
-v = jnp.ones_like(m)
-
-x, y = s_2.project_to_e(m, v)
-plt.plot(x[:,0], x[:, 1], zorder=0)
-plt.quiver(x[:,0], x[:, 1], y[:,0], y[:, 1], zorder=1)
-plt.gca().set_aspect('equal')
-# %%
-s_2.projection_matrix(m).shape
-
-# %%
 
 s1 = S1(0.5)
 # kernel = ScaledKernel(SquaredExponentialCompactRiemannianManifoldKernel(s1, 100))
@@ -189,7 +174,73 @@ plt.plot(x[:,0]*(1 + k[0, :, 0, 0]), x[:,1]*(1 + k[0, :, 0, 0]))
 plt.gca().set_aspect('equal')
 # %%
 _, k_ = s1.project_to_e(m, k[0, :, :, 0])
-plt.plot(x[:,0], x[:, 1], zorder=0)
-plt.quiver(x[:,0], x[:, 1], k_[:,0], k_[:, 1], zorder=1)
-plt.gca().set_aspect('equal')
+plt.plot(x[:, 0], x[:, 1], zorder=0)
+plt.quiver(x[:, 0], x[:, 1], k_[:, 0], k_[:, 1], zorder=1)
+plt.gca().set_aspect("equal")
 # %%
+
+scale = 30 * 2
+n_cond = 10
+n_ind = 10
+
+sparse_gp = SparseGaussianProcess(kernel, n_ind, 99, 20)
+sparse_gp_params, sparse_gp_state = sparse_gp.init_params_with_state(next(rng))
+sparse_gp_params = sparse_gp_params._replace(kernel_params=kernel_params)
+sparse_gp_state = sparse_gp.randomize(sparse_gp_params, sparse_gp_state, next(rng))
+
+sparse_gp_params = sparse_gp.set_inducing_points(
+    sparse_gp_params,
+    jr.uniform(next(rng), (n_ind, 1)) * jnp.pi * 2,
+    jr.normal(next(rng), (n_ind, 1)) * 3,
+    jnp.ones((n_ind, 1)) * 0.0001,
+)
+
+samples = sparse_gp.prior(
+    sparse_gp_params.kernel_params, sparse_gp_state.prior_state, m
+)
+
+i = 0
+sample = samples[i]
+_, sample_ = s1.project_to_e(m, sample)
+
+inducing_means = sparse_gp.get_inducing_mean(sparse_gp_params, sparse_gp_state)
+inducing_locs_, inducing_means_ = s1.project_to_e(
+    sparse_gp_params.inducing_locations, inducing_means
+)
+
+plt.plot(x[:, 0], x[:, 1], color="black", zorder=0)
+plt.quiver(
+    inducing_locs_[:, 0],
+    inducing_locs_[:, 1],
+    inducing_means_[:, 0],
+    inducing_means_[:, 1],
+    color="green",
+    scale=scale,
+    zorder=1,
+)
+
+posterior_samples, (prior, data) = sparse_gp(sparse_gp_params, sparse_gp_state, m)
+for i in range(posterior_samples.shape[0]):
+    _, ps_ = s1.project_to_e(m, posterior_samples[i])
+    plt.quiver(
+        x[:, 0],
+        x[:, 1],
+        ps_[:, 0],
+        ps_[:, 1],
+        color="grey",
+        scale=scale,
+        alpha=0.3,
+    )
+
+plt.gca().set_aspect("equal")
+
+# %%
+
+plt.scatter(sparse_gp_params.inducing_locations[:, 0], inducing_means[:, 0])
+for i in range(posterior_samples.shape[0]):
+    plt.plot(
+        m[:, 0],
+        posterior_samples[i, :, 0],
+        color="grey",
+        alpha=0.3,
+    )

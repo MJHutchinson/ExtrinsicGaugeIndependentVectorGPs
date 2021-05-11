@@ -175,7 +175,7 @@ f = ff(kernel_params, ff_state, m)
 for i in range(samples):
     torus_mesh.add_scalar_quantity(f"sample {i}", f[i,:,0], enabled=False)
 # %%
-i = 3 #+ int(n_points *0.5)
+i = 1  # + int(n_points *0.5)
 
 # plt.imshow(eig_func[:, i, 0].reshape((n_points, n_points)))
 plt.contourf(
@@ -379,28 +379,17 @@ kernel_params = kernel_params._replace(sub_kernel_params=sub_kernel_params)
 kernel_params = kernel_params._replace(log_amplitude=-jnp.log(kernel.matrix(kernel_params, m,m)[0,0,0,0]))
 k = kernel.matrix(kernel_params, m, m)
 # %%
-
-scale=20
-n_cond = 10
-n_ind = 10
-
-sparse_gp = SparseGaussianProcess(kernel, n_ind, 99, 100)
-sparse_gp_params, sparse_gp_state = sparse_gp.init_params_with_state(next(rng))
-
-sparse_gp_params = sparse_gp.set_inducing_points(
-    sparse_gp_params,
-    jr.uniform(next(rng), (n_ind, 2)) * jnp.pi * 2,
-    jr.normal(next(rng), (n_ind, 2)),
-    jnp.ones((n_ind, 2)) * 0.1
-)
-
-
 # m_cond_ind = jr.permutation(next(rng), jnp.arange(m.shape[0]))[:n_cond]
 # m_cond = m[m_cond_ind]
 # v_cond = jr.normal(next(rng), (n_cond, 2))
 # noises_cond = jnp.ones_like(v_cond) * 0.01
 
-sample = sparse_gp.prior(sparse_gp_params.kernel_params, sparse_gp_state.prior_state, m)[3]
+samples = sparse_gp.prior(
+    sparse_gp_params.kernel_params, sparse_gp_state.prior_state, m
+)
+
+i = 0
+sample = samples[i]
 
 plt.quiver(
     m[:,0],
@@ -434,7 +423,30 @@ for i in range(inducing_noise.shape[0]):
     )
     plt.gca().add_artist(e)
 
-plt.gca().set_aspect('equal')
-plt.xlim(0, 2*jnp.pi)
-plt.ylim(0, 2*jnp.pi)
+plt.gca().set_aspect("equal")
+plt.xlim(0, 2 * jnp.pi)
+plt.ylim(0, 2 * jnp.pi)
+
+posterior_samples = sparse_gp(sparse_gp_params, sparse_gp_state, m)
+
+for i in range(posterior_samples.shape[0]):
+    plt.quiver(
+        m[:, 0],
+        m[:, 1],
+        posterior_samples[i, :, 0],
+        posterior_samples[i, :, 1],
+        color="grey",
+        scale=scale,
+        alpha=0.3,
+    )
+# %%
+# %%
+samples = 10
+ff = FourierFeatures(kernel, 100)
+ff_state = ff.init_state(kernel_params, samples, next(rng))
+f = ff(kernel_params, ff_state, m)
+# %%
+i = jr.randint(next(rng), (), 0, f.shape[0])
+plt.quiver(m[:, 0], m[:, 1], f[i, :, 0], f[i, :, 1], jnp.linalg.norm(f[i], axis=-1))
+plt.gca().set_aspect("equal")
 # %%
