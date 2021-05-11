@@ -66,6 +66,14 @@ class AbstractKernel(ABC):
         pass
 
 
+class AbstractRFFKernel(AbstractKernel):
+    pass
+
+
+class AbstractKLKernel(AbstractKernel):
+    pass
+
+
 class FourierFeatureState(NamedTuple):
     basis_function_state: NamedTuple
     weights: jnp.ndarray
@@ -138,6 +146,8 @@ class FourierFeatures:
             x,
         )
         weights = state.weights
+        print(f"{weights.shape=}")
+        print(f"{basis_functions.shape=}")
         return jnp.einsum(
             "mloe,sle->smo", basis_functions, weights
         )  # tf2jax.linalg.matvec(basis_functions, weights)

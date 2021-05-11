@@ -1,4 +1,6 @@
 from abc import ABC, ABCMeta, abstractmethod
+from functools import reduce
+import operator
 import jax.numpy as jnp
 
 from jax import jit
@@ -7,6 +9,7 @@ from functools import partial
 
 class AbstractRiemannianMainfold(ABC):
     dimension = None
+    compact = False
 
     @abstractmethod
     def laplacian_eigenvalue(
@@ -56,24 +59,27 @@ class ProductManifold(AbstractRiemannianMainfold):
         self.dimension = sum(self.sub_dimensions)
         self.num_eigenfunctions = num_eigenfunctions
 
-        # precompute the eigenindicies of the product manifold eigenvalues
-        sub_manifold_eigenindicies = [
-            jnp.arange(self.num_eigenfunctions) for m in self.sub_manifolds
-        ]
-        sub_manifold_eigenvalues = [
-            m.laplacian_eigenvalue(i)
-            for m, i in zip(self.sub_manifolds, sub_manifold_eigenindicies)
-        ]
-        sub_manifold_eigenindicies = jnp.stack(
-            jnp.meshgrid(*sub_manifold_eigenindicies), axis=-1
-        ).reshape((-1, len(self.sub_manifolds)))
-        sub_manifold_eigenvalues = jnp.sum(
-            jnp.stack(jnp.meshgrid(*sub_manifold_eigenvalues), axis=-1), axis=-1
-        ).reshape(-1)
-        index = jnp.argsort(sub_manifold_eigenvalues)
-        self.sub_manifold_eigenindicies = sub_manifold_eigenindicies[index][
-            : self.num_eigenfunctions
-        ]
+        self.compact = reduce(operator.and_, [m.compact for m in self.sub_manifolds])
+
+        if self.compact:
+            # precompute the eigenindicies of the product manifold eigenvalues
+            sub_manifold_eigenindicies = [
+                jnp.arange(self.num_eigenfunctions) for m in self.sub_manifolds
+            ]
+            sub_manifold_eigenvalues = [
+                m.laplacian_eigenvalue(i)
+                for m, i in zip(self.sub_manifolds, sub_manifold_eigenindicies)
+            ]
+            sub_manifold_eigenindicies = jnp.stack(
+                jnp.meshgrid(*sub_manifold_eigenindicies), axis=-1
+            ).reshape((-1, len(self.sub_manifolds)))
+            sub_manifold_eigenvalues = jnp.sum(
+                jnp.stack(jnp.meshgrid(*sub_manifold_eigenvalues), axis=-1), axis=-1
+            ).reshape(-1)
+            index = jnp.argsort(sub_manifold_eigenvalues)
+            self.sub_manifold_eigenindicies = sub_manifold_eigenindicies[index][
+                : self.num_eigenfunctions
+            ]
 
     @partial(jit, static_argnums=(0))
     def laplacian_eigenvalue(
@@ -85,16 +91,19 @@ class ProductManifold(AbstractRiemannianMainfold):
         #     raise ValueError(
         #         f"Max n ({n.max()}) greater than the precomputed eigenvalues ({self.num_eigenfunctions}) for this product manifold"
         #     )
-        return jnp.sum(
-            jnp.stack(
-                [
-                    m.laplacian_eigenvalue(self.sub_manifold_eigenindicies[n, i])
-                    for i, m in enumerate(self.sub_manifolds)
-                ],
+        if self.compact:
+            return jnp.sum(
+                jnp.stack(
+                    [
+                        m.laplacian_eigenvalue(self.sub_manifold_eigenindicies[n, i])
+                        for i, m in enumerate(self.sub_manifolds)
+                    ],
+                    axis=-1,
+                ),
                 axis=-1,
-            ),
-            axis=-1,
-        )
+            )
+        else:
+            raise NotImplementedError()
 
     @partial(jit, static_argnums=(0))
     def laplacian_eigenfunction(
@@ -102,17 +111,22 @@ class ProductManifold(AbstractRiemannianMainfold):
         n: jnp.ndarray,
         x: jnp.ndarray,
     ) -> jnp.ndarray:
-        sub_x = jnp.split(x, self.sub_dimensions[:-1], axis=-1)
-        return jnp.prod(
-            jnp.stack(
-                [
-                    m.laplacian_eigenfunction(self.sub_manifold_eigenindicies[n, i], x)
-                    for i, (m, x) in enumerate(zip(self.sub_manifolds, sub_x))
-                ],
+        if self.compact:
+            sub_x = jnp.split(x, self.sub_dimensions[:-1], axis=-1)
+            return jnp.prod(
+                jnp.stack(
+                    [
+                        m.laplacian_eigenfunction(
+                            self.sub_manifold_eigenindicies[n, i], x
+                        )
+                        for i, (m, x) in enumerate(zip(self.sub_manifolds, sub_x))
+                    ],
+                    axis=-1,
+                ),
                 axis=-1,
-            ),
-            axis=-1,
-        )
+            )
+        else:
+            raise NotImplementedError()
 
     def __repr__(
         self,

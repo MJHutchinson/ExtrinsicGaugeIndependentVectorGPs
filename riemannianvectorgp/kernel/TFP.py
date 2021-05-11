@@ -11,14 +11,14 @@ from tensorflow_probability.python.internal.backend import jax as tf2jax
 tfp = tensorflow_probability.experimental.substrates.jax
 tfk = tfp.math.psd_kernels
 
-from .kernel import AbstractKernel, RandomBasisFunctionState
+from .kernel import AbstractRFFKernel, RandomBasisFunctionState
 
 
 class TFPKernelParameters(NamedTuple):
     log_length_scales: jnp.ndarray
 
 
-class TFPKernel(AbstractKernel):
+class TFPKernel(AbstractRFFKernel):
     """A kernel with learned amplitude and length scale parameters."""
 
     def __init__(

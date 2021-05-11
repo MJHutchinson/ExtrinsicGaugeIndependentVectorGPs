@@ -10,6 +10,7 @@ from .embedded_manifold import AbstractEmbeddedRiemannianManifold
 
 class S1(AbstractRiemannianMainfold):
     dimension = 1
+    compact = True
 
     def __init__(
         self,
@@ -43,7 +44,10 @@ class S1(AbstractRiemannianMainfold):
     def __repr__(
         self,
     ):
-        return f"S1({self.radius})"
+        if self.radius == 1.0:
+            return f"\U0001D4E2\u2081"
+        else:
+            return f"\U0001D4E2\u2081({self.radius})"
 
 
 class EmbeddedS1(AbstractEmbeddedRiemannianManifold, S1):
