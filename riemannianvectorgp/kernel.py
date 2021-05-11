@@ -9,7 +9,7 @@ tfp = tensorflow_probability.experimental.substrates.jax
 tfk = tfp.math.psd_kernels
 
 class AbstractKernel(ABC):
-    @abstractmethod 
+    @abstractmethod
     def init_params(
         self,
         key: jnp.ndarray,

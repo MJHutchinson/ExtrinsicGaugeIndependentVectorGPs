@@ -7,12 +7,14 @@ from typing import Union
 from skyfield.api import wgs84, load, EarthSatellite
 from scipy.interpolate import interp2d
 import os
+import click
 
-
-def get_winddata(target_dir: str = "global_wind_dataset", resolution: int = 5):
+@click.command()
+@click.option("--target-dir", default = "global_wind_dataset", type=str, help="directory to save data")
+@click.option("--resolution", default = 5, type=click.Choice([1, 2, 5]), help="resolution of wind data (choose from 1, 2 or 5)")
+def get_winddata(target_dir, resolution):
     """
-    This function downloads the global wind data from weatherbench
-    https://github.com/pangeo-data/WeatherBench
+    This function downloads the regridded ERA5 global wind data
     Args:
         target_dir: target directory to save wind data
         resolution: resolution of wind data. To choose between 1, 2 or 5.
@@ -31,19 +33,19 @@ def get_winddata(target_dir: str = "global_wind_dataset", resolution: int = 5):
 
     # Download u and v components of global wind
     print("fetching url for u component...")
-    r_u = requests.get(url_u)
+    r_u = requests.get(url_u, verify=False)
     print("fetching url for v component...")
-    r_v = requests.get(url_v)
+    r_v = requests.get(url_v, verify=False)
 
-    zipfile_u = "10m_u_component_of_wind_{res}deg.zip"
-    zipfile_v = "10m_v_component_of_wind_{res}deg.zip"
+    zipfile_u = f"10m_u_component_of_wind_{res}deg.zip"
+    zipfile_v = f"10m_v_component_of_wind_{res}deg.zip"
 
     print("saving contents of u component...")
     open(zipfile_u, 'wb').write(r_u.content)
     print("saving contents of v component...")
     open(zipfile_v, 'wb').write(r_v.content)
     
-    os.mkdir(target_dir)
+    os.mkdir(target_dir) if not os.path.exists(target_dir) else None
 
     # Unzip files to target directory
     print("unzipping file for u component...")
@@ -126,7 +128,7 @@ class WindDataGeneratorRandom(keras.utils.Sequence):
             np.random.shuffle(self.idxs)
 
 
-def GetDataAlongSatellite(ds, hours):
+def GetDataAlongSatelliteTrack(ds, hours):
     """
         Generate wind data along the trajectories of Aeolus (satellite)
         More information about Aeolus: https://www.n2yo.com/satellite/?s=43600 
@@ -158,66 +160,5 @@ def GetDataAlongSatellite(ds, hours):
     return np.stack(location), np.stack(wind)
 
 
-class WindDataGeneratorSatellite(keras.utils.Sequence):
-    def __init__(
-        self,
-        ds: xr.Dataset,
-        num_obs: int,
-        window_size: int,
-        gap_size: int = 6,
-        shuffle: bool = True,
-        load: bool = True):
-        """
-        Generate wind data along the trajectories of Aeolus (satellite)
-        More information about Aeolus: https://www.n2yo.com/satellite/?s=43600 
-        Args:
-            ds: Dataset containing all variables
-            num_obs: Number of random locations where wind velocity is measured
-            window_size: Number of consecutive observations in assimilation window
-            gap_size: Gap between two observations (in hours)
-            shuffle: bool. If True, data is shuffled.
-            load: bool. If True, datadet is loaded into RAM.
-        """
-        self.ds = ds
-        self.lon = ds.isel(time=0).lon.values
-        self.lat = ds.isel(time=0).lat.values
-        self.num_obs = num_obs
-        self.window_size = window_size
-        self.gap_size = gap_size
-        self.shuffle = shuffle
-        self.n_samples = ds.isel(time=slice(0, -window_size)).dims["time"]
-        self.n_windows = int(self.n_samples - self.gap_size * self.window_size)
-
-        self.on_epoch_end()
-
-        # Load data into RAM (this speeds up the data loading process)
-        if load: self.ds.load()
-
-    def __len__(self):
-        return self.n_windows
-    
-    def __getitem__(self, i):
-        start_idx = self.idxs[i]
-        X, y = [], []
-        for t in range(self.window_size):
-            u, v = [], []
-            self.lon_idxs = np.random.randint(0, self.ds.dims['lon'], size=(self.num_obs,))
-            self.lat_idxs = np.random.randint(0, self.ds.dims['lat'], size=(self.num_obs,))
-            for n in range(self.num_obs):
-                u.append(self.ds.isel(
-                    time=start_idx + self.gap_size * t,
-                    lon=self.lon_idxs[n],
-                    lat=self.lat_idxs[n]).u10.values)
-                v.append(self.ds.isel(
-                    time=start_idx + self.gap_size * t,
-                    lon=self.lon_idxs[n],
-                    lat=self.lat_idxs[n]).v10.values)
-            X.append([self.lon[self.lon_idxs], self.lat[self.lat_idxs]])
-            y.append([u, v])
-        return start_idx, np.stack(X), np.stack(y)
-
-    def on_epoch_end(self):
-        'Updates indexes after each epoch'
-        self.idxs = np.arange(self.n_windows)
-        if self.shuffle == True:
-            np.random.shuffle(self.idxs)
+if __name__ == '__main__':
+    get_winddata()

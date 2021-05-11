@@ -171,10 +171,10 @@ class SparseGaussianProcess:
         rescaled_x = x / inner_weights
         basis_fn_inner_prod = rescaled_x @ prior_frequency
         basis_fn = jnp.cos(basis_fn_inner_prod + jnp.expand_dims(prior_phase,-2))
-        basis_weights = jnp.sqrt(2/L) * outer_weights * prior_weights
+        basis_weights = jnp.sqrt(2/L) * outer_weights[None, :, None] * prior_weights # outer_weights has shape (out_dim,) and prior_weights has shape (num_samples, out_dim, num_basis)
         output = tf2jax.linalg.matvec(basis_fn, basis_weights)
 
-        return output
+        return output # shape (num_samples, out_dim, num_inducing)
 
 
     @partial(jax.jit, static_argnums=(0,))
@@ -231,7 +231,7 @@ class SparseGaussianProcess:
         s = jnp.exp(params.log_error_stddev)
         (n_samples,_,n_batch) = f.shape
         c = n_data / (n_batch * n_samples * 2)
-        l = n_data*jnp.sum(jnp.log(s)) + c*jnp.sum(((y - f) / s)**2)
+        l = n_data*jnp.sum(jnp.log(s)) + c*jnp.sum(((y[None] - f) / s[None, :, None])**2)
         
         r = self.hyperprior(params,state)
         
