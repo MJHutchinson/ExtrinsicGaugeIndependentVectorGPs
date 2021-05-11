@@ -19,6 +19,7 @@ from riemannianvectorgp.kernel import (
     ManifoldProjectionVectorKernel, 
     MaternCompactRiemannianManifoldKernel, 
     SquaredExponentialCompactRiemannianManifoldKernel,
+    ProductKernel,
     FourierFeatures,
     TFPKernel
 )
@@ -337,4 +338,48 @@ plt.quiver(
     scale=scale
 )
 plt.gca().set_aspect('equal')
+# %%
+
+num_basis_functions = 1000
+num_samples = 2000
+
+n_points = 50
+r = jnp.linspace(-5, 5, n_points)
+m = jnp.linspace(0, 2 * jnp.pi, n_points + 1)[:-1]
+r, m = jnp.meshgrid(r, m)
+m = jnp.stack([m.flatten(), r.flatten()], axis=-1)
+
+s1 = S1(1.0)
+k_s1 = MaternCompactRiemannianManifoldKernel(1.5, s1, 500)
+k_s1_params = k_s1.init_params(next(rng))
+k_s1_params = k_s1_params._replace(log_length_scale=jnp.log(0.3))
+
+k_r1 = TFPKernel(tfk.ExponentiatedQuadratic, 1, 1)
+k_r1_params = k_r1.init_params(next(rng))
+
+kernel = ProductKernel(k_s1, k_r1)
+product_kernel_params = kernel.init_params(next(rng))
+product_kernel_params = product_kernel_params._replace(sub_kernel_params=[k_s1_params, k_r1_params])
+
+kernel = ScaledKernel(kernel)
+kernel_params = kernel.init_params(next(rng))
+kernel_params = kernel_params._replace(sub_kernel_params=product_kernel_params)
+kernel_params = kernel_params._replace(log_amplitude=-jnp.log(kernel.matrix(kernel_params, m,m)[0,0,0,0]))
+k = kernel.matrix(kernel_params, m, m)
+
+ff = FourierFeatures(kernel, num_basis_functions)
+state = ff.init_state(kernel_params, num_samples, next(rng))
+f = ff(kernel_params, state, m)
+
+m_ff = jnp.mean(f,axis=0)
+k_ff = jnp.mean(f[..., :, np.newaxis, :, np.newaxis] * f[..., np.newaxis, :, np.newaxis, :], axis=0)
+# %%
+k_err = k - k_ff
+mean_err = jnp.mean(k_err)
+max_err = jnp.max(jnp.abs(k_err))
+
+print(mean_err, max_err)
+# %%
+
+print(eval_kernel(kernel, kernel_params, m, next(rng)))
 # %%

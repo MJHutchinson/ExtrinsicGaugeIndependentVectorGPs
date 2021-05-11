@@ -11,7 +11,9 @@ import jax
 import jax.numpy as jnp
 import jax.random as jr
 import jax.scipy as jsp
+import optax
 from tensorflow_probability.python.internal.backend import jax as tf2jax
+from einops import rearrange
 
 import matplotlib.pyplot as plt
 from IPython.display import set_matplotlib_formats
@@ -38,6 +40,68 @@ from jax.config import config
 # config.update("jax_disable_jit", True)
 
 # %%
+
+def plot_gp(x, y, gp, params, state, samples=False):
+
+    fig, axs = plt.subplots(3, 1, figsize=(4, 9))
+
+    state = gp.randomize(params, state, next(rng))
+
+    K = gp.kernel.matrix(
+        params.kernel_params, params.inducing_locations, params.inducing_locations
+    )
+    K = rearrange(K, "M1 M2 OD1 OD2 -> (M1 OD1) (M2 OD2)")
+
+    M, OD = params.inducing_pseudo_log_err_stddev.shape
+    Sigma = rearrange(
+        jnp.exp(2 * params.inducing_pseudo_log_err_stddev), "M OD -> (M OD)"
+    )
+    Sigma = jnp.diag(Sigma)
+    inducing_pseudo_mean = rearrange(params.inducing_pseudo_mean, "M OD -> (M OD)")
+
+    inducing_mean = tf2jax.linalg.matvec(
+        K + Sigma,
+        inducing_pseudo_mean,
+    )
+    inducing_mean = rearrange(inducing_mean, "(M OD) -> M OD", M=M, OD=OD)
+    f = gp(params, state, x)[:, :, 0]
+    f_prior = gp.prior(params.kernel_params, state.prior_state, x)[:, :, 0]
+
+    k = kernel.matrix(params.kernel_params, x, x)[0, :, 0]
+
+    x = x[:, 0]
+    y = y[:, 0]
+
+    axs[0].scatter(x, y)
+    # ax.set_rmin-(-4)
+
+    m = jnp.mean(f, axis=0)
+    u = jnp.quantile(f, 0.975, axis=0)
+    l = jnp.quantile(f, 0.025, axis=0)
+
+    axs[0].plot(x, m, linewidth=2)
+    axs[0].fill_between(x, l, u, alpha=0.5)
+
+    if samples:
+        for i in range(f.shape[0]):
+            axs[0].plot(x, f[i, :], color="gray", alpha=0.5)
+
+    axs[0].scatter(params.inducing_locations[:, 0], inducing_mean, zorder=6)
+    axs[0].errorbar(
+        params.inducing_locations[:, 0],
+        inducing_mean[:, 0],
+        yerr=jnp.exp(params.inducing_pseudo_log_err_stddev[:, 0]),
+        linestyle="none",
+        zorder=5,
+    )
+    axs[0].set_title("Sparse GP")
+    axs[1].plot(x, f_prior.T)
+    axs[1].set_title("Prior samples")
+    axs[2].plot(x, k)
+    axs[2].set_title("Kernel")
+
+    plt.tight_layout()
+
 class GlobalRNG:
     def __init__(self, seed: int = np.random.randint(2147483647)):
         self.key = jax.random.PRNGKey(seed)
@@ -54,9 +118,9 @@ rng = GlobalRNG()
 # %%
 
 s1 = EmbeddedS1(0.5)
-
-m = jnp.linspace(0, jnp.pi*2, 26)[:-1, np.newaxis] % (2 * jnp.pi)
-v = jnp.ones_like(m)
+n_points=100
+m = jnp.linspace(0, jnp.pi*2, n_points+1)[:-1, np.newaxis] % (2 * jnp.pi)
+v = 2 * jnp.sin(m) + jr.normal(next(rng), m.shape) / 10
 x, y = s1.project_to_e(m, v)
 
 # %%
@@ -160,7 +224,12 @@ plt.gca().set_aspect('equal')
 
 s1 = EmbeddedS1(0.5)
 # kernel = ScaledKernel(SquaredExponentialCompactRiemannianManifoldKernel(s1, 100))
-kernel = ScaledKernel(ManifoldProjectionVectorKernel(MaternCompactRiemannianManifoldKernel(0.5,s1, 100), s1))
+kernel = ScaledKernel(
+    ManifoldProjectionVectorKernel(
+        MaternCompactRiemannianManifoldKernel(0.5,s1, 100),
+        s1
+    )
+)
 kernel_params = kernel.init_params(next(rng))
 sub_kernel_params = kernel_params.sub_kernel_params
 sub_kernel_params = sub_kernel_params._replace(log_length_scale=jnp.log(0.1))
@@ -181,27 +250,28 @@ plt.gca().set_aspect("equal")
 
 scale = 30 * 2
 n_cond = 10
-n_ind = 10
+n_ind = 11
 
 sparse_gp = SparseGaussianProcess(kernel, n_ind, 99, 20)
 sparse_gp_params, sparse_gp_state = sparse_gp.init_params_with_state(next(rng))
 sparse_gp_params = sparse_gp_params._replace(kernel_params=kernel_params)
 sparse_gp_state = sparse_gp.randomize(sparse_gp_params, sparse_gp_state, next(rng))
 
+
+m_ind = jnp.expand_dims(jnp.linspace(0, 2 * jnp.pi, n_ind), -1)
+v_ind = 2 * jnp.sin(m_ind) + jr.normal(next(rng), m_ind.shape) / 10
+# v_ind = jnp.zeros_like(m_ind)
+
 sparse_gp_params = sparse_gp.set_inducing_points(
     sparse_gp_params,
-    jr.uniform(next(rng), (n_ind, 1)) * jnp.pi * 2,
-    jr.normal(next(rng), (n_ind, 1)) * 3,
-    jnp.ones((n_ind, 1)) * 0.0001,
+    m_ind,
+    v_ind,
+    jnp.ones((n_ind, 1)) * 0.01,
 )
+# %%
+plot_gp(m, v, sparse_gp, sparse_gp_params, sparse_gp_state)
+# %%
 
-samples = sparse_gp.prior(
-    sparse_gp_params.kernel_params, sparse_gp_state.prior_state, m
-)
-
-i = 0
-sample = samples[i]
-_, sample_ = s1.project_to_e(m, sample)
 
 inducing_means = sparse_gp.get_inducing_mean(sparse_gp_params, sparse_gp_state)
 inducing_locs_, inducing_means_ = s1.project_to_e(
@@ -219,7 +289,7 @@ plt.quiver(
     zorder=1,
 )
 
-posterior_samples, (prior, data) = sparse_gp(sparse_gp_params, sparse_gp_state, m)
+posterior_samples = sparse_gp(sparse_gp_params, sparse_gp_state, m)
 for i in range(posterior_samples.shape[0]):
     _, ps_ = s1.project_to_e(m, posterior_samples[i])
     plt.quiver(
@@ -233,14 +303,39 @@ for i in range(posterior_samples.shape[0]):
     )
 
 plt.gca().set_aspect("equal")
+# %%
+opt = optax.chain(optax.scale_by_adam(b1=0.9, b2=0.999, eps=1e-8), optax.scale(-0.01))
+opt_state = opt.init(sparse_gp_params)
+
+# %%
+debug_params = [sparse_gp_params]
+debug_states = [sparse_gp_state]
+debug_keys = [rng.key]
+
+# %%
+for i in range(600):
+    ((train_loss, sparse_gp_state), grads) = jax.value_and_grad(sparse_gp.loss, has_aux=True)(
+        sparse_gp_params, sparse_gp_state, next(rng), m, v, m.shape[0]
+    )
+    (updates, opt_state) = opt.update(grads, opt_state)
+    sparse_gp_params = optax.apply_updates(sparse_gp_params, updates)
+    if jnp.all(jnp.isnan(grads.kernel_params.sub_kernel_params.log_length_scale)):
+        print("breaking for nan")
+        break
+    if i <= 10 or i % 20 == 0:
+        print(i, "Loss:", train_loss)
+    debug_params.append(sparse_gp_params)
+    debug_states.append(sparse_gp_state)
+    debug_keys.append(rng.key)
 
 # %%
 
-plt.scatter(sparse_gp_params.inducing_locations[:, 0], inducing_means[:, 0])
-for i in range(posterior_samples.shape[0]):
-    plt.plot(
-        m[:, 0],
-        posterior_samples[i, :, 0],
-        color="grey",
-        alpha=0.3,
-    )
+plot_gp(m, v, sparse_gp, sparse_gp_params, sparse_gp_state)
+# %%
+
+prior, data = sparse_gp.sample_parts(sparse_gp_params, sparse_gp_state, m)
+# %%
+i = 0
+plt.plot(m[:,0], prior[i, :,0], color='orange')
+plt.plot(m[:,0], data[i, :,0], color='purple')
+# %%

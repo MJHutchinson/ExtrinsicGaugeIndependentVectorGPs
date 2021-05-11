@@ -34,8 +34,9 @@ from riemannianvectorgp.kernel import (
     ScaledKernel,
     EigenBasisFunctionState,
     TFPKernel,
+    ManifoldProjectionVectorKernel,
 )
-from riemannianvectorgp.manifold import S1
+from riemannianvectorgp.manifold import S1, EmbeddedS1
 from einops import rearrange
 
 
@@ -228,7 +229,7 @@ kernel = ScaledKernel(SquaredExponentialCompactRiemannianManifoldKernel(s1, 100)
 # kernel = ScaledKernel(MaternCompactRiemannianManifoldKernel(1.5, s1, 100))
 kernel_params = kernel.init_params(next(rng))
 sub_kernel_params = kernel_params.sub_kernel_params
-sub_kernel_params = sub_kernel_params._replace(log_length_scale=jnp.log(0.01))
+sub_kernel_params = sub_kernel_params._replace(log_length_scale=jnp.log(0.1))
 kernel_params = kernel_params._replace(sub_kernel_params=sub_kernel_params)
 kernel_params = kernel_params._replace(
     log_amplitude=-jnp.log(kernel.matrix(kernel_params, x, x)[0, 0, 0])
@@ -237,10 +238,28 @@ k = kernel.matrix(kernel_params, x, x)
 
 print(k.shape)
 plt.plot(x[:, 0], k[0, :, 0, 0], label="EQ")
-
+# %%
+s1 = EmbeddedS1(1.0)
+kernel = ScaledKernel(
+    ManifoldProjectionVectorKernel(
+        # SquaredExponentialCompactRiemannianManifoldKernel(s1, 100)
+        MaternCompactRiemannianManifoldKernel(0.5, s1, 100),
+        s1,
+    )
+)
+kernel_params = kernel.init_params(next(rng))
+sub_kernel_params = kernel_params.sub_kernel_params
+sub_kernel_params = sub_kernel_params._replace(log_length_scale=jnp.log(0.1))
+kernel_params = kernel_params._replace(sub_kernel_params=sub_kernel_params)
+kernel_params = kernel_params._replace(
+    log_amplitude=-jnp.log(kernel.matrix(kernel_params, x, x)[0, 0, 0, 0])
+)
+k = kernel.matrix(kernel_params, x, x)
+print(k.shape)
+plt.plot(x[:, 0], k[0, :, 0, 0], label="EQ")
 # %%
 rng = GlobalRNG()
-gp = SparseGaussianProcess(kernel, 1, 1, 11, 67, 100)
+gp = SparseGaussianProcess(kernel, 11, 67, 100)
 (params, state) = gp.init_params_with_state(next(rng))
 params = params._replace(kernel_params=kernel_params)
 
