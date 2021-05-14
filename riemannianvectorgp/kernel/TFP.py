@@ -64,7 +64,9 @@ class TFPKernel(AbstractRFFKernel):
         """
         length_scales = jnp.exp(params.log_length_scales)
         tfp_kernel = self.tfp_class(amplitude=None, length_scale=length_scales)
-        return tfp_kernel.matrix(x1, x2)[..., np.newaxis, np.newaxis]
+        return tfp_kernel.matrix(x1, x2)[..., np.newaxis, np.newaxis] * jnp.eye(
+            self.output_dimension
+        )
 
     @partial(jit, static_argnums=(0, 3))
     def sample_fourier_features(
