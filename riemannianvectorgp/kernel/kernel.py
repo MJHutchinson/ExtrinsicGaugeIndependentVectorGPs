@@ -146,8 +146,8 @@ class FourierFeatures:
             x,
         )
         weights = state.weights
-        print(f"{weights.shape=}")
-        print(f"{basis_functions.shape=}")
+        print(f"{weights.shape}")
+        print(f"{basis_functions.shape}")
         return jnp.einsum(
             "mloe,sle->smo", basis_functions, weights
         )  # tf2jax.linalg.matvec(basis_functions, weights)

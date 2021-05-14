@@ -82,7 +82,6 @@ class GaussianProcess:
             locations.shape[0],
         )
         noises_ = rearrange(noises, "N OD -> (N OD)")
-
         K = self.kernel.matrix(params.kernel_params, locations, locations)
         K = rearrange(K, "N1 N2 OD1 OD2 -> (N1 OD1) (N2 OD2)")
         K = K + jnp.diag(noises_)
@@ -110,7 +109,7 @@ class GaussianProcess:
         state: GaussianProcessState,
         x: jnp.ndarray,
     ) -> jnp.ndarray:
-        """Evaluates the sparse GP for a given input matrix.
+        """Evaluates the GP for a given input matrix.
 
         Args:
             x: the input matrix.
