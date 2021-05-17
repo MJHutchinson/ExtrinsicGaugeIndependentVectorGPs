@@ -114,9 +114,42 @@ class SparseGaussianProcess:
 
         f_prior = self.prior(kernel_params, prior_state, x)
         K = self.kernel.matrix(kernel_params, x, inducing_locations)
-        f_data = jnp.einsum("mnop,snp->smo", K, inducing_weights)  # non-batched
+
+        if len(x.shape) == 2:
+            f_data = jnp.einsum("mnop,snp->smo", K, inducing_weights)  # non-batched
+        elif len(x.shape) == 3:
+            f_data = jnp.einsum("smnop,snp->smo", K, inducing_weights)  # non-batched
 
         return f_prior + f_data  # , (f_prior, f_data)
+
+    # @partial(jax.jit, static_argnums=(0,))
+    # def rollout(
+    #     self,
+    #     params: SparseGaussianProcessParameters,
+    #     state: SparseGaussianProcessState,
+    #     x: jnp.ndarray,
+    # ) -> jnp.ndarray:
+    #     """Evaluates the sparse GP for a given input matrix.
+
+    #     Args:
+    #         x: the input matrix.
+    #     """
+    #     (S, OD, ID, M) = (
+    #         self.num_samples,
+    #         self.output_dimension,
+    #         self.input_dimension,
+    #         self.num_inducing,
+    #     )
+    #     inducing_locations = params.inducing_locations
+    #     kernel_params = params.kernel_params
+    #     inducing_weights = state.inducing_weights
+    #     prior_state = state.prior_state
+
+    #     f_prior = self.prior(kernel_params, prior_state, x)
+    #     K = self.kernel.matrix(kernel_params, x, inducing_locations)
+    #     f_data = jnp.einsum("smnop,snp->smo", K, inducing_weights)  # non-batched
+
+    #     return f_prior + f_data  # , (f_prior, f_data)
 
     @partial(jax.jit, static_argnums=(0,))
     def randomize(

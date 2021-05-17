@@ -148,9 +148,17 @@ class FourierFeatures:
         weights = state.weights
         print(f"{weights.shape=}")
         print(f"{basis_functions.shape=}")
-        return jnp.einsum(
-            "mloe,sle->smo", basis_functions, weights
-        )  # tf2jax.linalg.matvec(basis_functions, weights)
+        # return jnp.einsum(
+        #     "mloe,sle->smo", basis_functions, weights
+        # )  # tf2jax.linalg.matvec(basis_functions, weights)
+        if len(x.shape) == 2:
+            return jnp.einsum(
+                "mloe,sle->smo", basis_functions, weights
+            )  # tf2jax.linalg.matvec(basis_functions, weights)
+        elif len(x.shape) == 3:
+            return jnp.einsum(
+                "smloe,sle->smo", basis_functions, weights
+            )  # tf2jax.linalg.matvec(basis_functions, weights)
 
 
 # class ScaledKernelParameters(NamedTuple):
