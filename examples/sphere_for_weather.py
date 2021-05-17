@@ -50,7 +50,7 @@ import polyscope as ps
 #ps.init()
 
 # %%
-#S2 = EmbeddedS2(1.0)
+S2 = EmbeddedS2(1.0)
 
 num_points = 30
 phi = jnp.linspace(0, jnp.pi, num_points)
@@ -93,28 +93,28 @@ plt.colorbar()
 plt.title("Scalar Euclidean EQ kernel")
 
 # %% Manifold Scalar Kernel ##
-# ms_kernel = ScaledKernel(
-#     MaternCompactRiemannianManifoldKernel(1.5, S2, 144)
-# )  # 144 is the maximum number of basis functions we have implemented
-# ms_kernel_params = ms_kernel.init_params(next(rng))
-# sub_kernel_params = ms_kernel_params.sub_kernel_params
-# sub_kernel_params = sub_kernel_params._replace(log_length_scale=jnp.log(1))
-# ms_kernel_params = ms_kernel_params._replace(sub_kernel_params=sub_kernel_params)
-# ms_kernel_params = ms_kernel_params._replace(
-#     log_amplitude=-jnp.log(ms_kernel.matrix(ms_kernel_params, m, m)[0, 0, 0, 0])
-# )
-# ms_k = ms_kernel.matrix(ms_kernel_params, m, m)
+ms_kernel = ScaledKernel(
+    MaternCompactRiemannianManifoldKernel(1.5, S2, 144)
+)  # 144 is the maximum number of basis functions we have implemented
+ms_kernel_params = ms_kernel.init_params(next(rng))
+sub_kernel_params = ms_kernel_params.sub_kernel_params
+sub_kernel_params = sub_kernel_params._replace(log_length_scale=jnp.log(1))
+ms_kernel_params = ms_kernel_params._replace(sub_kernel_params=sub_kernel_params)
+ms_kernel_params = ms_kernel_params._replace(
+    log_amplitude=-jnp.log(ms_kernel.matrix(ms_kernel_params, m, m)[0, 0, 0, 0])
+)
+ms_k = ms_kernel.matrix(ms_kernel_params, m, m)
 
-# i = int((num_points ** 2 + num_points) / 2)
-# plt.contourf(
-#     m[:, 0].reshape((num_points, num_points)),
-#     m[:, 1].reshape((num_points, num_points)),
-#     ms_k[i, :, 0, 0].reshape((num_points, num_points)),
-#     50,
-# )
-# plt.gca().set_aspect("equal")
-# plt.colorbar()
-# plt.title("Scalar S2 Matern 3/2 kernel")
+i = int((num_points ** 2 + num_points) / 2)
+plt.contourf(
+    m[:, 0].reshape((num_points, num_points)),
+    m[:, 1].reshape((num_points, num_points)),
+    ms_k[i, :, 0, 0].reshape((num_points, num_points)),
+    50,
+)
+plt.gca().set_aspect("equal")
+plt.colorbar()
+plt.title("Scalar S2 Matern 3/2 kernel")
 
 # %% ## Euclidean Vector Kernel ##
 ev_kernel = ScaledKernel(TFPKernel(tfk.ExponentiatedQuadratic, 2, 2))
@@ -139,28 +139,28 @@ plt.gca().set_aspect("equal")
 plt.title("Vector Euclidean EQ kernel")
 
 # %% Manifold Vector Kernel ##
-# mv_kernel = ScaledKernel(
-#     ManifoldProjectionVectorKernel(
-#         MaternCompactRiemannianManifoldKernel(1.5, S2, 144), S2
-#     )
-# )  # 144 is the maximum number of basis functions we have implemented
-# mv_kernel_params = mv_kernel.init_params(next(rng))
-# sub_kernel_params = mv_kernel_params.sub_kernel_params
-# sub_kernel_params = sub_kernel_params._replace(log_length_scale=jnp.log(0.5))
-# mv_kernel_params = mv_kernel_params._replace(sub_kernel_params=sub_kernel_params)
-# mv_kernel_params = mv_kernel_params._replace(
-#     log_amplitude=-jnp.log(mv_kernel.matrix(mv_kernel_params, m, m)[0, 0, 0, 0])
-# )
-# mv_k = mv_kernel.matrix(mv_kernel_params, m, m)
+mv_kernel = ScaledKernel(
+    ManifoldProjectionVectorKernel(
+        MaternCompactRiemannianManifoldKernel(1.5, S2, 144), S2
+    )
+)  # 144 is the maximum number of basis functions we have implemented
+mv_kernel_params = mv_kernel.init_params(next(rng))
+sub_kernel_params = mv_kernel_params.sub_kernel_params
+sub_kernel_params = sub_kernel_params._replace(log_length_scale=jnp.log(0.5))
+mv_kernel_params = mv_kernel_params._replace(sub_kernel_params=sub_kernel_params)
+mv_kernel_params = mv_kernel_params._replace(
+    log_amplitude=-jnp.log(mv_kernel.matrix(mv_kernel_params, m, m)[0, 0, 0, 0])
+)
+mv_k = mv_kernel.matrix(mv_kernel_params, m, m)
 
-# i = int((num_points ** 2 + num_points) / 2)
-# vec = jnp.array([0, 1])
-# operator = mv_k[:, i] @ vec
-# plt.quiver(m[:, 0], m[:, 1], operator[:, 0], operator[:, 1], color="blue")
-# plt.quiver(m[i, 0], m[i, 1], vec[0], vec[1], color="red")
-# plt.gca().set_aspect("equal")
-# # plt.colorbar()
-# plt.title("Vector S2 Matern 3/2 kernel")
+i = int((num_points ** 2 + num_points) / 2)
+vec = jnp.array([0, 1])
+operator = mv_k[:, i] @ vec
+plt.quiver(m[:, 0], m[:, 1], operator[:, 0], operator[:, 1], color="blue")
+plt.quiver(m[i, 0], m[i, 1], vec[0], vec[1], color="red")
+plt.gca().set_aspect("equal")
+# plt.colorbar()
+plt.title("Vector S2 Matern 3/2 kernel")
 
 # %% Draw a set to condition on
 n_cond = 10

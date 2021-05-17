@@ -32,31 +32,38 @@ def _deg2rad(x: np.ndarray):
     return (np.pi/180)*x
 
 
-def GetDataAlongSatelliteTrack(ds: xr.Dataset, satellite: EarthSatellite):
+def GetDataAlongSatelliteTrack(
+    ds: xr.Dataset,
+    satellite: EarthSatellite,
+    year: int = 2021,
+    month: int = 1,
+    day: int = 1,
+    hour: int = 0):
     """
         Generate wind data along the trajectories of Aeolus (satellite)
         More information about the Aeolus satellite: https://www.n2yo.com/satellite/?s=43600 
     """
-    lon = _deg2rad(ds.isel(time=0).lon.values)
-    lat = _deg2rad(ds.isel(time=0).lat.values)
-    u_2018_01_01 = ds.u10.sel(time='2018-01-01').values
-    v_2018_01_01 = ds.v10.sel(time='2018-01-01').values
+    date = f'{year}-{month}-{day}'
+    lon = _deg2rad(ds.isel(time=0).longitude.values)
+    lat = _deg2rad(ds.isel(time=0).latitude.values)
+    u = ds.u100.sel(time=date).values
+    v = ds.v100.sel(time=date).values
 
-    time_span = ts.utc(2018, 1, 1, 0, range(0, 60))
+    time_span = ts.utc(year, month, day, hour, range(0, 60))
     geocentric = satellite.at(time_span)
     subpoint = wgs84.subpoint(geocentric)
     lon_location = subpoint.longitude.radians + np.pi
     lat_location = subpoint.latitude.radians
-    u_interp = interp2d(lon, lat, u_2018_01_01[0], kind='linear')
-    v_interp = interp2d(lon, lat, v_2018_01_01[0], kind='linear')
-    u, v = [], []
+    u_interp = interp2d(lon, lat, u[hour], kind='linear')
+    v_interp = interp2d(lon, lat, v[hour], kind='linear')
+    u_along_sat_track, v_along_sat_track = [], []
     for x, y in zip(lon_location, lat_location):
-        u.append(u_interp(x, y).item())
-        v.append(v_interp(x, y).item())
+        u_along_sat_track.append(u_interp(x, y).item())
+        v_along_sat_track.append(v_interp(x, y).item())
     location = [lat_location, lon_location]
-    wind = [u, v]
+    wind = [u_along_sat_track, v_along_sat_track]
 
-    return np.stack(location).transpose(), np.stack(wind)
+    return np.stack(location).transpose(), np.stack(wind).transpose()
 
 
 if __name__ == '__main__':
@@ -67,14 +74,16 @@ if __name__ == '__main__':
     aeolus = EarthSatellite(line1, line2, 'AEOLUS', ts)
 
     rng = GlobalRNG()
-    ds = xr.open_mfdataset('../datasets/global_wind_dataset/*.nc')
-    lon = _deg2rad(ds.isel(time=0).lon.values)
-    lat = _deg2rad(ds.isel(time=0).lat.values)
+    ds = xr.open_mfdataset('../datasets/era5_dataset/*.nc')
+    lon = _deg2rad(ds.isel(time=0).longitude.values)
+    lat = _deg2rad(ds.isel(time=0).latitude.values)
     mesh = np.meshgrid(lon, lat)
 
     phi, theta = jnp.meshgrid(lat, lon)
-    phi = phi.flatten()
-    theta = theta.flatten()
+    phi = phi.flatten()[::20]
+    theta = theta.flatten()[::20]
+    lat_size = phi.shape[0]
+    lon_size = theta.shape[0]
     m = jnp.stack([phi, theta], axis=-1)
     
     # Get inputs and outputs
@@ -86,22 +95,11 @@ if __name__ == '__main__':
     ev_kernel = ScaledKernel(TFPKernel(tfk.ExponentiatedQuadratic, 2, 2))
     ev_kernel_params = ev_kernel.init_params(next(rng))
     sub_kernel_params = ev_kernel_params.sub_kernel_params
-    sub_kernel_params = sub_kernel_params._replace(log_length_scales=jnp.log(1))
+    sub_kernel_params = sub_kernel_params._replace(log_length_scales=jnp.log(0.5))
     ev_kernel_params = ev_kernel_params._replace(sub_kernel_params=sub_kernel_params)
     ev_kernel_params = ev_kernel_params._replace(
         log_amplitude=-jnp.log(ev_kernel.matrix(ev_kernel_params, m, m)[0, 0, 0, 0])
     )
-    ev_k = ev_kernel.matrix(ev_kernel_params, m, m) * jnp.eye(2) 
-
-    i = 1000
-    vec = jnp.array([0, 1])
-    operator = ev_k[:, i] @ vec
-    plt.quiver(m[:, 1], m[:, 0], operator[:, 0], operator[:, 1], color="blue")
-    plt.quiver(m[i, 1], m[i, 0], vec[0], vec[1], color="red")
-    plt.gca().set_aspect("equal")
-    plt.title("Vector Euclidean EQ kernel")
-
-    plt.savefig("figs/vector_kernel.png")
 
     # Set up Euclidean Vector GP
     ev_gp = GaussianProcess(ev_kernel)
@@ -118,8 +116,8 @@ if __name__ == '__main__':
     plt.quiver(
         theta,
         phi,
-        mean[:,0],
-        mean[:,1],
+        mean[:, 0],
+        mean[:, 1],
         color="blue",
         alpha=0.5,
         scale=scale,
@@ -131,8 +129,8 @@ if __name__ == '__main__':
     plt.quiver(
         m_cond[:, 1],
         m_cond[:, 0],
-        v_cond[0, :],
-        v_cond[1, :],
+        v_cond[:, 0],
+        v_cond[:, 1],
         color="red",
         scale=scale,
         width=0.003,
@@ -146,15 +144,26 @@ if __name__ == '__main__':
     plt.contour(*mesh, lsm, zorder=1)
 
     plt.title("posterior mean")
-    plt.savefig("figs/wind_interpolation_gp.png")
+    plt.savefig("figs/wind_interpolation_gp_euclidean_mean.png")
+
+    # Plot standard deviations
+    var_norm = jnp.diag(jnp.trace(K, axis1=2, axis2=3)).reshape(lon_size, lat_size)
+    std_norm = jnp.sqrt(var_norm).transpose()
+
+    fig = plt.figure(figsize=(10,5))
+    plt.contourf(*mesh, std_norm, levels=30, zorder=1)
+    plt.contour(*mesh, lsm, zorder=2)
+
+    plt.title("posterior std")
+    plt.savefig("figs/wind_interpolation_gp_euclidean_std.png")
 
     # Plot ground truth
-    u_2018_01_01 = ds.u10.sel(time='2018-01-01').values[0]
-    v_2018_01_01 = ds.v10.sel(time='2018-01-01').values[0]
+    u_gt = ds.u100.sel(time='2021-01-01').values[0]
+    v_gt = ds.v100.sel(time='2021-01-01').values[0]
     plt.figure(figsize=(10, 5))
     plt.contour(*mesh, lsm, zorder=1)
 
-    plt.quiver(*mesh, u_2018_01_01, v_2018_01_01,
+    plt.quiver(*mesh, u_gt, v_gt,
                alpha=0.5,
                zorder=2,
                color='black',
@@ -164,13 +173,12 @@ if __name__ == '__main__':
 
     plt.quiver(m_cond[:, 1],
                m_cond[:, 0],
-               v_cond[0, :],
-               v_cond[1, :],
+               v_cond[:, 0],
+               v_cond[:, 1],
                color='red',
                scale=350,
                width=0.003,
                headwidth=3)
-    plt.show()
 
     plt.savefig("figs/ground_truth.png")
 
