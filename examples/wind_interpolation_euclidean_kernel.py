@@ -1,5 +1,6 @@
 import xarray as xr
 import numpy as np
+from typing import List
 import jax
 import jax.numpy as jnp
 import jax.random as jr
@@ -15,6 +16,10 @@ from riemannianvectorgp.kernel.scaled import ScaledKernel
 from riemannianvectorgp.kernel.TFP import TFPKernel
 from skyfield.api import wgs84, load, EarthSatellite
 from scipy.interpolate import interp2d
+import cartopy
+import cartopy.crs as ccrs
+import xesmf as xe
+import copy
 
 class GlobalRNG:
     def __init__(self, seed: int = np.random.randint(2147483647)):
@@ -32,27 +37,37 @@ def _deg2rad(x: np.ndarray):
     return (np.pi/180)*x
 
 
+def _rad2deg(x: np.ndarray):
+    return (180/np.pi)*x
+
+
+def _jump_where(x):
+        for i in range(1,len(x)):
+            if np.abs(x[i-1] - x[i]) > 180:
+                return i
+
+
 def GetDataAlongSatelliteTrack(
     ds: xr.Dataset,
     satellite: EarthSatellite,
-    year: int = 2021,
-    month: int = 1,
-    day: int = 1,
-    hour: int = 0):
+    year: int,
+    month: int,
+    day: int,
+    hour: int) -> List[np.ndarray]:
     """
         Generate wind data along the trajectories of Aeolus (satellite)
         More information about the Aeolus satellite: https://www.n2yo.com/satellite/?s=43600 
     """
-    date = f'{year}-{month}-{day}'
-    lon = _deg2rad(ds.isel(time=0).longitude.values)
-    lat = _deg2rad(ds.isel(time=0).latitude.values)
+    date = f"{year}-{month}-{day}"
+    lon = _deg2rad(ds.isel(time=0).lon.values)
+    lat = _deg2rad(ds.isel(time=0).lat.values)
     u = ds.u100.sel(time=date).values
     v = ds.v100.sel(time=date).values
 
     time_span = ts.utc(year, month, day, hour, range(0, 60))
     geocentric = satellite.at(time_span)
     subpoint = wgs84.subpoint(geocentric)
-    lon_location = subpoint.longitude.radians + np.pi
+    lon_location = subpoint.longitude.radians
     lat_location = subpoint.latitude.radians
     u_interp = interp2d(lon, lat, u[hour], kind='linear')
     v_interp = interp2d(lon, lat, v[hour], kind='linear')
@@ -67,35 +82,54 @@ def GetDataAlongSatelliteTrack(
 
 
 if __name__ == '__main__':
+    rng = GlobalRNG()
+
+    year = 2019
+    month = 1
+    day = 1
+    hour = 0
+    min = 0
+    date = f"{year}-{month}-{day} {hour}:{min}"
+
     # Get Aeolus trajectory data from TLE set
     ts = load.timescale()
     line1 = '1 43600U 18066A   21112.99668353  .00040037  00000-0  16023-3 0  9999'
     line2 = '2 43600  96.7174 120.6934 0007334 114.6816 245.5221 15.86410481154456'
     aeolus = EarthSatellite(line1, line2, 'AEOLUS', ts)
 
-    rng = GlobalRNG()
+    # Load ERA5 data and regrid
+    resolution = 5.625
     ds = xr.open_mfdataset('../datasets/era5_dataset/*.nc')
-    lon = _deg2rad(ds.isel(time=0).longitude.values)
-    lat = _deg2rad(ds.isel(time=0).latitude.values)
+    grid_out = xr.Dataset(
+        {
+            'lat': (['lat'], np.arange(-90+resolution/2, 90, resolution)),
+            'lon': (['lon'], np.arange(-180+resolution/2, 180, resolution)),
+        }
+    )
+    ds = ds.rename({'latitude': 'lat', 'longitude': 'lon'})
+    regridder = xe.Regridder(ds, grid_out, 'bilinear', periodic=True)
+    ds = regridder(ds)
+    lon = ds.isel(time=0).lon
+    lat = ds.isel(time=0).lat
+    lon_size = lon.shape[0]
+    lat_size = lat.shape[0]
     mesh = np.meshgrid(lon, lat)
 
-    phi, theta = jnp.meshgrid(lat, lon)
-    phi = phi.flatten()[::20]
-    theta = theta.flatten()[::20]
-    lat_size = phi.shape[0]
-    lon_size = theta.shape[0]
+    phi, theta = jnp.meshgrid(_deg2rad(lat), _deg2rad(lon))
+    phi = phi.flatten()
+    theta = theta.flatten()
     m = jnp.stack([phi, theta], axis=-1)
     
     # Get inputs and outputs
-    m_cond, v_cond = GetDataAlongSatelliteTrack(ds, aeolus)
+    m_cond, v_cond = GetDataAlongSatelliteTrack(ds, aeolus, year, month, day, hour)
     m_cond, v_cond = jnp.asarray(m_cond), jnp.asarray(v_cond)
-    noises_cond = jnp.ones_like(v_cond) * 0.01
+    noises_cond = jnp.ones_like(v_cond) * 1.7
 
     # Set up kernel
     ev_kernel = ScaledKernel(TFPKernel(tfk.ExponentiatedQuadratic, 2, 2))
     ev_kernel_params = ev_kernel.init_params(next(rng))
     sub_kernel_params = ev_kernel_params.sub_kernel_params
-    sub_kernel_params = sub_kernel_params._replace(log_length_scales=jnp.log(0.5))
+    sub_kernel_params = sub_kernel_params._replace(log_length_scales=jnp.log(0.2))
     ev_kernel_params = ev_kernel_params._replace(sub_kernel_params=sub_kernel_params)
     ev_kernel_params = ev_kernel_params._replace(
         log_amplitude=-jnp.log(ev_kernel.matrix(ev_kernel_params, m, m)[0, 0, 0, 0])
@@ -112,36 +146,45 @@ if __name__ == '__main__':
     mean, K = ev_gp(ev_gp_params, ev_gp_state, m)
 
     fig = plt.figure(figsize=(10, 5))
+    ax = plt.axes(projection=ccrs.PlateCarree())
+    ax.add_feature(cartopy.feature.LAND, zorder=0)
+    ax.coastlines()
 
     plt.quiver(
-        theta,
-        phi,
+        _rad2deg(theta),
+        _rad2deg(phi),
         mean[:, 0],
         mean[:, 1],
         color="blue",
         alpha=0.5,
         scale=scale,
         width=0.003,
-        headwidth=3,
-        zorder=4
+        headwidth=3
     )
 
     plt.quiver(
-        m_cond[:, 1],
-        m_cond[:, 0],
+        _rad2deg(m_cond[:, 1]),
+        _rad2deg(m_cond[:, 0]),
         v_cond[:, 0],
         v_cond[:, 1],
         color="red",
         scale=scale,
         width=0.003,
-        headwidth=3,
-        zorder=5,
+        headwidth=3
     )
 
-    constants = xr.open_dataset("../datasets/constants/constants.nc")
-    lsm = constants.lsm.values
+    # Plot satellite trajectories
+    idx = _jump_where(_rad2deg(m_cond[:, 1]))
+    x1 = copy.deepcopy(_rad2deg(m_cond[:idx+1, 1]))
+    y1 = _rad2deg(m_cond[:idx+1, 0])
+    x1[idx] = x1[idx]-360
 
-    plt.contour(*mesh, lsm, zorder=1)
+    x2 = copy.deepcopy(_rad2deg(m_cond[idx-1:, 1]))
+    y2 = _rad2deg(m_cond[idx-1:, 0])
+    x2[0] = x2[0] + 360
+
+    plt.plot(x1, y1, c='r', alpha=0.5, linewidth=2)
+    plt.plot(x2, y2, c='r', alpha=0.5, linewidth=2)
 
     plt.title("posterior mean")
     plt.savefig("figs/wind_interpolation_gp_euclidean_mean.png")
@@ -151,34 +194,46 @@ if __name__ == '__main__':
     std_norm = jnp.sqrt(var_norm).transpose()
 
     fig = plt.figure(figsize=(10,5))
+    ax = plt.axes(projection=ccrs.PlateCarree())
+    ax.coastlines()
     plt.contourf(*mesh, std_norm, levels=30, zorder=1)
-    plt.contour(*mesh, lsm, zorder=2)
+
+    plt.plot(x1, y1, c='r', alpha=0.5, linewidth=2)
+    plt.plot(x2, y2, c='r', alpha=0.5, linewidth=2)
 
     plt.title("posterior std")
     plt.savefig("figs/wind_interpolation_gp_euclidean_std.png")
 
     # Plot ground truth
-    u_gt = ds.u100.sel(time='2021-01-01').values[0]
-    v_gt = ds.v100.sel(time='2021-01-01').values[0]
+    u_gt = ds.u100.sel(time=date).values
+    v_gt = ds.v100.sel(time=date).values
+    
     plt.figure(figsize=(10, 5))
-    plt.contour(*mesh, lsm, zorder=1)
+    ax = plt.axes(projection=ccrs.PlateCarree())
+    ax.add_feature(cartopy.feature.LAND, zorder=0)
+    ax.coastlines()
+    ax.add_feature(cartopy.feature.OCEAN, zorder=0)
 
     plt.quiver(*mesh, u_gt, v_gt,
-               alpha=0.5,
-               zorder=2,
+               alpha=0.3,
+               zorder=1,
                color='black',
                scale=350,
                width=0.003,
                headwidth=3)
 
-    plt.quiver(m_cond[:, 1],
-               m_cond[:, 0],
+    plt.quiver(_rad2deg(m_cond[:, 1]),
+               _rad2deg(m_cond[:, 0]),
                v_cond[:, 0],
                v_cond[:, 1],
+               zorder=2,
                color='red',
                scale=350,
                width=0.003,
                headwidth=3)
+
+    plt.plot(x1, y1, c='r', alpha=0.5, linewidth=2)
+    plt.plot(x2, y2, c='r', alpha=0.5, linewidth=2)
 
     plt.savefig("figs/ground_truth.png")
 
