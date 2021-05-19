@@ -3,7 +3,7 @@ import optax
 
 
 def train_sparse_gp(
-    gp, gp_params, gp_state, m_cond, v_cond, rng, b1=0.9, b2=0.999, eps=1e-8, lr=0.01
+    gp, gp_params, gp_state, m_cond, v_cond, rng, epochs=300, b1=0.9, b2=0.999, eps=1e-8, lr=0.01
 ):
     opt = optax.chain(optax.scale_by_adam(b1=b1, b2=b2, eps=eps), optax.scale(-lr))
     opt_state = opt.init(gp_params)
@@ -11,7 +11,7 @@ def train_sparse_gp(
     debug_states = [gp_state]
     debug_keys = [rng.key]
     losses = []
-    for i in range(300):
+    for i in range(epochs):
         ((train_loss, gp_state), grads) = jax.value_and_grad(gp.loss, has_aux=True)(
             gp_params, gp_state, next(rng), m_cond, v_cond, m_cond.shape[0]
         )

@@ -10,10 +10,14 @@ tfk = tfp.math.psd_kernels
 import optax
 import matplotlib.pyplot as plt
 import sys; sys.path.insert(0, '..')
-from riemannianvectorgp.sparse_gp import SparseGaussianProcess, SparseGaussianProcessParameters
-from riemannianvectorgp.kernel.scaled import ScaledKernel
-from riemannianvectorgp.kernel.TFP import TFPKernel
-from riemannianvectorgp.kernel.utils import train_sparse_gp, GlobalRNG
+from riemannianvectorgp.sparse_gp import SparseGaussianProcess
+from riemannianvectorgp.manifold import EmbeddedS2
+from riemannianvectorgp.kernel import (
+    MaternCompactRiemannianManifoldKernel,
+    ManifoldProjectionVectorKernel,
+    ScaledKernel,
+    TFPKernel
+)
 import cartopy
 import cartopy.crs as ccrs
 import xesmf as xe
@@ -41,9 +45,10 @@ def _rad2deg(x: np.ndarray, offset: float=0.):
 if __name__ == "__main__":
     rng = GlobalRNG()
     date = '2018-01-01 00:00'
+    geometry = 's2'
 
-    # Load ERA5 data and regrid
-    ds = xr.open_mfdataset('../datasets/weatherbench_wind_data/*.nc')
+    # Load ERA5 data
+    ds = xr.open_mfdataset('../../datasets/weatherbench_wind_data/*.nc')
 
     lon = ds.isel(time=0).lon
     lat = ds.isel(time=0).lat
@@ -57,7 +62,7 @@ if __name__ == "__main__":
     m = jnp.stack([phi, theta], axis=-1)
 
     # Get inputs and outputs
-    weekly_mean = np.load("../datasets/weekly_climatology.npz")
+    weekly_mean = np.load("../../datasets/climatology/weekly_climatology.npz")
 
     u = ds.u10.sel(time=date)
     v = ds.v10.sel(time=date)
@@ -76,19 +81,28 @@ if __name__ == "__main__":
     mean = np.stack([v_mean, u_mean], axis=-1)
 
     # Set up kernel
-    ev_kernel = ScaledKernel(TFPKernel(tfk.ExponentiatedQuadratic, 2, 2))
-    ev_kernel_params = ev_kernel.init_params(next(rng))
-    sub_kernel_params = ev_kernel_params.sub_kernel_params
+    if geometry == 'r2':
+        kernel = ScaledKernel(TFPKernel(tfk.ExponentiatedQuadratic, 2, 2))
+    elif geometry == 's2':
+        S2 = EmbeddedS2(1.0)
+        kernel = ScaledKernel(
+            ManifoldProjectionVectorKernel(
+                MaternCompactRiemannianManifoldKernel(1.5, S2, 144), S2
+            )
+        ) # 144 is the maximum number of basis functions we have implemented
+
+    kernel_params = kernel.init_params(next(rng))
+    sub_kernel_params = kernel_params.sub_kernel_params
     sub_kernel_params = sub_kernel_params._replace(log_length_scales=jnp.log(0.2))
-    ev_kernel_params = ev_kernel_params._replace(sub_kernel_params=sub_kernel_params)
-    ev_kernel_params = ev_kernel_params._replace(
-        log_amplitude=-jnp.log(ev_kernel.matrix(ev_kernel_params, m, m)[0, 0, 0, 0])
+    kernel_params = kernel_params._replace(sub_kernel_params=sub_kernel_params)
+    kernel_params = kernel_params._replace(
+        log_amplitude=-jnp.log(kernel.matrix(kernel_params, m, m)[0, 0, 0, 0])
     )
 
-    # Set up Euclidean Sparse GP
+    # Set up Sparse GP
     num_points = 20
     ev_sparse_gp = SparseGaussianProcess(
-                    kernel=ev_kernel,
+                    kernel=kernel,
                     num_inducing=num_points**2,
                     num_basis=144,
                     num_samples=10)
@@ -102,7 +116,7 @@ if __name__ == "__main__":
     phi_init, theta_init = phi_init.flatten(), theta_init.flatten()
     init_locations = jnp.stack([phi_init, theta_init], axis=-1)
 
-    params = params._replace(kernel_params=ev_kernel_params)
+    params = params._replace(kernel_params=kernel_params)
     params = params._replace(inducing_locations=init_locations)
 
     state = ev_sparse_gp.resample_prior_basis(params, state, next(rng))
