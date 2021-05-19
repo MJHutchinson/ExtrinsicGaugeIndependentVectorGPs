@@ -1,5 +1,6 @@
 import cdsapi
 import xarray as xr
+import xesmf as xe
 import pandas as pd
 from urllib.request import urlopen
 import os
@@ -10,7 +11,7 @@ def get_era5(dataset_name='reanalysis-era5-single-levels',
              times=None,
              pressure_level=None,
              grid=[1.0, 1,0],
-             area=[90, -180, -90, 180],
+             area=[90, 0, -90, 360],
              download_flag = False,
              download_file='./output.nc'
             ):
@@ -93,7 +94,24 @@ def get_era5(dataset_name='reanalysis-era5-single-levels',
         date = dates,
         time = times
         )   
+    
+    # what to do if asking for monthly means
+    if dataset_name in ["reanalysis-era5-single-levels-monthly-means", 
+                        "reanalysis-era5-pressure-levels-monthly-means",
+                        "reanalysis-era5-land-monthly-means"]:
+        params["product_type"] = "monthly_averaged_reanalysis"
+        _ = params.pop("date")
+        params["time"] = "00:00"
         
+        # if time is in list of pandas format
+        if isinstance(dates, list):
+            dates_pd = pd.to_datetime(dates)
+            params["year"] = sorted(list(set(dates_pd.strftime("%Y"))))
+            params["month"] = sorted(list(set(dates_pd.strftime("%m"))))
+        else:
+            params["year"] = sorted(list(set(dates.strftime("%Y"))))
+            params["month"] = sorted(list(set(dates.strftime("%m"))))
+
     # if pressure surface
     if dataset_name in ["reanalysis-era5-pressure-levels-monthly-means",
                         "reanalysis-era5-pressure-levels"]:
@@ -116,24 +134,41 @@ def get_era5(dataset_name='reanalysis-era5-single-levels',
 
 
 if __name__ == '__main__':
-    """Download data for wind speed at 100m at given dates and times
+    """Download data for wind speed at 100m at given dates and times.
+    To run this, you first need to create an account at Copernicus at:
+    https://cds.climate.copernicus.eu/#!/home
+    and save your UID and API key by running
+    ```
+    {
+    echo 'url: https://cds.climate.copernicus.eu/api/v2'
+    echo 'key: <UID>:<API key>'
+    echo 'verify: 0'
+    } > ~/.cdsapirc
+    ```
+    on terminal. More details in:
+    https://towardsdatascience.com/read-era5-directly-into-memory-with-python-511a2740bba0
     """
+    
     dates = ['2019-01-01']
-    times = ['00:00']
+    times = [
+        '00:00','01:00','02:00','03:00','04:00','05:00','06:00','07:00','08:00',
+        '09:00','10:00','11:00','12:00','13:00','14:00','15:00','16:00','17:00',
+        '18:00','19:00','20:00','21:00','22:00','23:00'
+    ]
 
     os.mkdir('era5_dataset') if not os.path.exists('era5_dataset') else None
 
     get_era5(dataset_name='reanalysis-era5-single-levels', 
-             var='100m_u_component_of_wind', 
+             var='10m_u_component_of_wind', 
              dates=dates,
              times=times,
              download_flag=True,
-             download_file='era5_dataset/100m_u_component_of_wind_2019_01_01.nc')
+             download_file='era5_dataset/10m_u_component_of_wind_2019_01_01.nc')
 
     get_era5(dataset_name='reanalysis-era5-single-levels', 
-             var='100m_v_component_of_wind', 
-             dates=['2019-01-01'],
-             times=['00:00'],
+             var='10m_v_component_of_wind', 
+             dates=dates,
+             times=times,
              download_flag=True,
-             download_file='era5_dataset/100m_v_component_of_wind_2019_01_01.nc')
+             download_file='era5_dataset/10m_v_component_of_wind_2019_01_01.nc')
     

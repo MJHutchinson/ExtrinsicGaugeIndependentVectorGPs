@@ -1,5 +1,6 @@
 import math
 from functools import partial
+from typing import List
 import xarray as xr
 import numpy as np
 import jax.numpy as jnp
@@ -16,15 +17,12 @@ import matplotlib.pyplot as plt
 from riemannianvectorgp.gp import GaussianProcess
 from riemannianvectorgp.manifold import EmbeddedS2
 from riemannianvectorgp.kernel import (
-    TFPKernel,
     MaternCompactRiemannianManifoldKernel,
     ManifoldProjectionVectorKernel,
     ScaledKernel,
 )
 from skyfield.api import wgs84, load, EarthSatellite
 from scipy.interpolate import interp2d
-import sys
-import polyscope as ps
 
 class GlobalRNG:
     def __init__(self, seed: int = np.random.randint(2147483647)):
@@ -38,48 +36,65 @@ class GlobalRNG:
         return ret_key
 
 
-def _deg2rad(x: np.ndarray):
-    return (np.pi/180)*x
+def _deg2rad(x: np.ndarray, offset: float=0.):
+    return (np.pi/180)*x + offset
 
 
-def GetDataAlongSatelliteTrack(ds: xr.Dataset, satellite: EarthSatellite):
+def GetDataAlongSatelliteTrack(
+    ds: xr.Dataset,
+    satellite: EarthSatellite,
+    year: int,
+    month: int,
+    day: int,
+    hour: int) -> List[np.ndarray]:
     """
         Generate wind data along the trajectories of Aeolus (satellite)
         More information about the Aeolus satellite: https://www.n2yo.com/satellite/?s=43600 
     """
-    lon = _deg2rad(ds.isel(time=0).lon.values)
-    lat = _deg2rad(ds.isel(time=0).lat.values)
-    u_2018_01_01 = ds.u10.sel(time='2018-01-01').values
-    v_2018_01_01 = ds.v10.sel(time='2018-01-01').values
+    date = f"{year}-{month}-{day}"
+    lon = _deg2rad(ds.isel(time=0).lon.values) + jnp.pi
+    lat = _deg2rad(ds.isel(time=0).lat.values) + jnp.pi/2
+    u = ds.u10.sel(time=date).values
+    v = ds.v10.sel(time=date).values
 
-    time_span = ts.utc(2018, 1, 1, 0, range(0, 60))
+    time_span = ts.utc(year, month, day, hour, range(0, 60))
     geocentric = satellite.at(time_span)
     subpoint = wgs84.subpoint(geocentric)
-    lon_location = subpoint.longitude.radians + np.pi
-    lat_location = subpoint.latitude.radians
-    u_interp = interp2d(lon, lat, u_2018_01_01[0], kind='linear')
-    v_interp = interp2d(lon, lat, v_2018_01_01[0], kind='linear')
-    u, v = [], []
-    for x, y in zip(lon_location, lat_location):
-        u.append(u_interp(x, y).item())
-        v.append(v_interp(x, y).item())
-    location = [lat_location, lon_location]
-    wind = [u, v]
+    lon_location = subpoint.longitude.radians + jnp.pi
+    lat_location = subpoint.latitude.radians + jnp.pi/2
 
-    return np.stack(location).transpose(), np.stack(wind).transpose()
+    u_interp = interp2d(lon, lat, u[hour], kind='linear')
+    v_interp = interp2d(lon, lat, v[hour], kind='linear')
+    u_along_sat_track, v_along_sat_track = [], []
+    for x, y in zip(lon_location, lat_location):
+        u_along_sat_track.append(u_interp(x, y).item())
+        v_along_sat_track.append(v_interp(x, y).item())
+
+    location = jnp.stack([lat_location, lon_location])
+    wind = jnp.stack([jnp.stack(u_along_sat_track), jnp.stack(v_along_sat_track)])
+
+    return location.transpose(), wind.transpose()
 
 
 if __name__ == '__main__':
+    rng = GlobalRNG()
+
+    year = 2018
+    month = 1
+    day = 1
+    hour = 0
+    min = 0
+    date = f"{year}-{month}-{day} {hour}:{min}"
+
     # Get Aeolus trajectory data from TLE set
     ts = load.timescale()
     line1 = '1 43600U 18066A   21112.99668353  .00040037  00000-0  16023-3 0  9999'
     line2 = '2 43600  96.7174 120.6934 0007334 114.6816 245.5221 15.86410481154456'
     aeolus = EarthSatellite(line1, line2, 'AEOLUS', ts)
 
-    rng = GlobalRNG()
     ds = xr.open_mfdataset('../datasets/global_wind_dataset/*.nc')
     lon = _deg2rad(ds.isel(time=0).lon.values)
-    lat = _deg2rad(ds.isel(time=0).lat.values)
+    lat = _deg2rad(ds.isel(time=0).lat.values) + jnp.pi/2
     lon_size = lon.shape[0]
     lat_size = lat.shape[0]
     mesh = np.meshgrid(lon, lat)
@@ -90,9 +105,8 @@ if __name__ == '__main__':
     m = jnp.stack([phi, theta], axis=-1)
     
     # Get inputs and outputs
-    m_cond, v_cond = GetDataAlongSatelliteTrack(ds, aeolus)
-    m_cond, v_cond = jnp.asarray(m_cond), jnp.asarray(v_cond)
-    noises_cond = jnp.ones_like(v_cond) * 0.01
+    m_cond, v_cond = GetDataAlongSatelliteTrack(ds, aeolus, year, month, day, hour)
+    noises_cond = jnp.ones_like(v_cond) * 1.7
 
     # Set up manifold vector kernel
     S2 = EmbeddedS2(1.0)
@@ -108,17 +122,6 @@ if __name__ == '__main__':
     mv_kernel_params = mv_kernel_params._replace(
         log_amplitude=-jnp.log(mv_kernel.matrix(mv_kernel_params, m, m)[0, 0, 0, 0])
     )
-    mv_k = mv_kernel.matrix(mv_kernel_params, m, m)
-
-    i = 1000
-    vec = jnp.array([0, 1])
-    operator = mv_k[:, i] @ vec
-    plt.quiver(m[:, 1], m[:, 0], operator[:, 0], operator[:, 1], color="blue")
-    plt.quiver(m[i, 1], m[i, 0], vec[0], vec[1], color="red")
-    plt.gca().set_aspect("equal")
-    plt.title("Vector S2 Matern 3/2 kernel")
-
-    plt.savefig("figs/vector_kernel_spherical.png")
 
     # Set up manifold vector GP
     mv_gp = GaussianProcess(mv_kernel)

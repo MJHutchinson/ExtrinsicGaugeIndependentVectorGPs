@@ -53,7 +53,7 @@ def GetDataAlongSatelliteTrack(
     year: int,
     month: int,
     day: int,
-    hour: int) -> List[np.ndarray]:
+    hour: int) -> List[jnp.ndarray]:
     """
         Generate wind data along the trajectories of Aeolus (satellite)
         More information about the Aeolus satellite: https://www.n2yo.com/satellite/?s=43600 
@@ -64,21 +64,24 @@ def GetDataAlongSatelliteTrack(
     u = ds.u100.sel(time=date).values
     v = ds.v100.sel(time=date).values
 
+    ts = load.timescale()
     time_span = ts.utc(year, month, day, hour, range(0, 60))
     geocentric = satellite.at(time_span)
     subpoint = wgs84.subpoint(geocentric)
     lon_location = subpoint.longitude.radians
     lat_location = subpoint.latitude.radians
+
     u_interp = interp2d(lon, lat, u[hour], kind='linear')
     v_interp = interp2d(lon, lat, v[hour], kind='linear')
     u_along_sat_track, v_along_sat_track = [], []
     for x, y in zip(lon_location, lat_location):
         u_along_sat_track.append(u_interp(x, y).item())
         v_along_sat_track.append(v_interp(x, y).item())
-    location = [lat_location, lon_location]
-    wind = [u_along_sat_track, v_along_sat_track]
 
-    return np.stack(location).transpose(), np.stack(wind).transpose()
+    location = jnp.stack([lat_location, lon_location])
+    wind = jnp.stack([jnp.stack(u_along_sat_track), jnp.stack(v_along_sat_track)])
+
+    return location.transpose(), wind.transpose()
 
 
 if __name__ == '__main__':
@@ -122,18 +125,18 @@ if __name__ == '__main__':
     
     # Get inputs and outputs
     m_cond, v_cond = GetDataAlongSatelliteTrack(ds, aeolus, year, month, day, hour)
-    m_cond, v_cond = jnp.asarray(m_cond), jnp.asarray(v_cond)
     noises_cond = jnp.ones_like(v_cond) * 1.7
 
     # Set up kernel
     ev_kernel = ScaledKernel(TFPKernel(tfk.ExponentiatedQuadratic, 2, 2))
     ev_kernel_params = ev_kernel.init_params(next(rng))
     sub_kernel_params = ev_kernel_params.sub_kernel_params
-    sub_kernel_params = sub_kernel_params._replace(log_length_scales=jnp.log(0.2))
+    sub_kernel_params = sub_kernel_params._replace(log_length_scales=jnp.log(0.32))
     ev_kernel_params = ev_kernel_params._replace(sub_kernel_params=sub_kernel_params)
-    ev_kernel_params = ev_kernel_params._replace(
-        log_amplitude=-jnp.log(ev_kernel.matrix(ev_kernel_params, m, m)[0, 0, 0, 0])
-    )
+    # ev_kernel_params = ev_kernel_params._replace(
+    #     log_amplitude=-jnp.log(ev_kernel.matrix(ev_kernel_params, m, m)[0, 0, 0, 0])
+    # )
+    ev_kernel_params = ev_kernel_params._replace(log_amplitude=-0.31)
 
     # Set up Euclidean Vector GP
     ev_gp = GaussianProcess(ev_kernel)

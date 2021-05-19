@@ -1,4 +1,4 @@
-from typing import NamedTuple, Tuple
+from typing import NamedTuple, Tuple, Union, Dict
 import jax
 import jax.numpy as jnp
 import jax.random as jr
@@ -349,10 +349,21 @@ class SparseGaussianProcess:
     def hyperprior(
         self,
         params: SparseGaussianProcessParameters,
-        state: SparseGaussianProcessState,
+        hyperprior_mean: Union[NamedTuple, None],
+        hyperprior_std: Union[NamedTuple, None]
     ) -> jnp.ndarray:
         """Returns the log hyperprior regularization term of the GP."""
-        return jnp.zeros(())  # temporary
+        if hyperprior_mean is None:
+            return jnp.zeros(())
+        # amplitude
+        amp_mean = jnp.exp(hyperprior_mean.log_amplitude)
+        amp_std = jnp.exp(hyperprior_std.log_amplitude)
+        amp_reg = (jnp.exp(params.kernel_params.log_amplitude) - amp_mean)**2/(2*amp_std**2)
+        # length scale
+        scale_mean = jnp.exp(hyperprior_mean.sub_kernel_params.log_length_scales)
+        scale_std = jnp.exp(hyperprior_std.sub_kernel_params.log_length_scales)
+        scale_reg = (jnp.exp(params.kernel_params.sub_kernel_params.log_length_scales) - scale_mean)**2/(2*scale_std**2)
+        return amp_reg + scale_reg  # temporary
 
     @partial(jax.jit, static_argnums=(0,))
     def loss(
@@ -363,7 +374,10 @@ class SparseGaussianProcess:
         x: jnp.ndarray,
         y: jnp.ndarray,
         n_data: int,
+        hyperprior_mean: Union[NamedTuple, None]=None,
+        hyperprior_std: Union[NamedTuple, None]=None
     ) -> Tuple[jnp.ndarray, SparseGaussianProcessState]:
+
         state = self.randomize(params, state, key)
 
         kl = self.prior_kl(params, state)
@@ -374,7 +388,7 @@ class SparseGaussianProcess:
         c = n_data / (n_batch * n_samples * 2)
         l = n_data * jnp.sum(jnp.log(s)) + c * jnp.sum(((y - f) / s) ** 2)
 
-        r = self.hyperprior(params, state)
+        r = self.hyperprior(params, hyperprior_mean, hyperprior_std)
 
         return (kl + l + r, state)
 
