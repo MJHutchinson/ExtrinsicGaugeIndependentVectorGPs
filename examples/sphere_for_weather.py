@@ -323,5 +323,3 @@ plt.gca().set_aspect("equal")
 plt.xlim(0, jnp.pi)
 plt.ylim(0, 2 * jnp.pi)
 plt.title("Vector S2 Matern 3/2 kernel - Samples")
-
-# %%

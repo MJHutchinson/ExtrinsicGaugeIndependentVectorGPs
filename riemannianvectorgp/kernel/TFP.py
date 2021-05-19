@@ -132,7 +132,7 @@ class TFPKernel(AbstractRFFKernel):
 
         rescaled_x = x / length_scales
         basis_fn = jnp.sqrt(2 / L) * jnp.cos(
-            jnp.einsum("ni,boi->nbo", rescaled_x, frequency) + phase
+            jnp.einsum("...ni,boi->...nbo", rescaled_x, frequency) + phase
         )
         # print(frequency.shape)
         # print(phase.shape)

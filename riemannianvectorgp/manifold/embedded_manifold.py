@@ -253,12 +253,15 @@ class EmbeddedProductManifold(AbstractEmbeddedRiemannianManifold, ProductManifol
 
     @partial(jit, static_argnums=(0,))
     def projection_matrix(self, M):
+        M_shape = M.shape
+        M = M.reshape((-1, M_shape[-1]))
         sub_M = jnp.split(M, self.sub_dimensions[:-1], axis=-1)
         sub_projection_matricies = [
             self.sub_manifolds[i].projection_matrix(sub_M[i])
             for i in range(len(self.sub_manifolds))
         ]
-        return jax.vmap(jsp.linalg.block_diag)(*sub_projection_matricies)
+        block_diag = jax.vmap(jsp.linalg.block_diag)(*sub_projection_matricies)
+        return block_diag.reshape((*M_shape[:-1], *block_diag.shape[-2:]))
 
     def __mul__(self, other):
         if isinstance(other, AbstractEmbeddedRiemannianManifold):
