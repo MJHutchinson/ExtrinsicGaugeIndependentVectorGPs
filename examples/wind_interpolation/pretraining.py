@@ -15,6 +15,7 @@ from riemannianvectorgp.kernel import (
     TFPKernel
 )
 from riemannianvectorgp.utils import train_sparse_gp, GlobalRNG
+from examples.wind_interpolation.utils import deg2rad, refresh_kernel
 import click
 import pickle
 
@@ -29,26 +30,6 @@ def _get_v_cond(ds, date, climatology):
     u_anomaly, v_anomaly = u_anomaly.transpose().flatten(), v_anomaly.transpose().flatten()
     v_cond = np.stack([v_anomaly, u_anomaly], axis=-1)
     return v_cond
-
-
-def _refresh_kernel(key, kernel, init_log_length_scale, m, geometry):
-    kernel_params = kernel.init_params(key)
-    sub_kernel_params = kernel_params.sub_kernel_params
-    if geometry == 'r2':
-        sub_kernel_params = sub_kernel_params._replace(log_length_scales=init_log_length_scale)
-    if geometry == 's2':
-        sub_kernel_params = sub_kernel_params._replace(log_length_scale=init_log_length_scale)
-    kernel_params = kernel_params._replace(sub_kernel_params=sub_kernel_params)
-    kernel_params = kernel_params._replace(log_amplitude=-jnp.log(kernel.matrix(kernel_params, m, m)[0, 0, 0, 0]))
-    return kernel_params
-
-
-def _deg2rad(x: np.ndarray, offset: float=0.):
-    return (np.pi/180)*x + offset
-
-
-def _rad2deg(x: np.ndarray, offset: float=0.):
-    return (180/np.pi)*(x - offset)
     
 
 @click.command()
@@ -71,7 +52,7 @@ def main(logdir, samples, epochs, geometry):
     # Get input locations
     lon = ds.isel(time=0).lon
     lat = ds.isel(time=0).lat
-    lat, lon = jnp.meshgrid(_deg2rad(lat, offset=jnp.pi/2), _deg2rad(lon)) # Reparametrise as lat=(0, pi) and lon=(0, 2pi) 
+    lat, lon = jnp.meshgrid(deg2rad(lat, offset=jnp.pi/2), deg2rad(lon)) # Reparametrise as lat=(0, pi) and lon=(0, 2pi) 
     lat = lat.flatten()
     lon = lon.flatten()
     m_cond = jnp.stack([lat, lon], axis=-1)
@@ -113,7 +94,7 @@ def main(logdir, samples, epochs, geometry):
 
         # Initialise parameters and state
         params, state = sparse_gp.init_params_with_state(next(rng))
-        kernel_params = _refresh_kernel(next(rng), kernel, init_log_length_scale, m_cond, geometry)
+        kernel_params = refresh_kernel(next(rng), kernel, m_cond, geometry, init_log_length_scale)
 
         params = params._replace(kernel_params=kernel_params)
         params = params._replace(inducing_locations=init_inducing_locations)
@@ -139,7 +120,7 @@ def main(logdir, samples, epochs, geometry):
         log_length_scales.append(log_length_scale)
         log_amplitudes.append(log_amplitude)
 
-    with open(logdir+'/'+geometry+'_params.pickle', "wb") as f:
+    with open(logdir+'/'+geometry+'_params_pretrained.pickle', "wb") as f:
         pickle.dump({'log_length_scale': np.stack(log_length_scales), 'log_amplitude': np.stack(log_amplitudes)}, f)
 
 
