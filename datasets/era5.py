@@ -10,7 +10,7 @@ def get_era5(dataset_name='reanalysis-era5-single-levels',
              dates=None,
              times=None,
              pressure_level=None,
-             grid=[1.0, 1,0],
+             grid=[0.25, 0.25],
              area=[90, 0, -90, 360],
              download_flag = False,
              download_file='./output.nc'
@@ -134,7 +134,7 @@ def get_era5(dataset_name='reanalysis-era5-single-levels',
 
 
 if __name__ == '__main__':
-    """Download data for wind speed at 100m at given dates and times.
+    """Download ERA5 data for wind speed at given dates and times.
     To run this, you first need to create an account at Copernicus at:
     https://cds.climate.copernicus.eu/#!/home
     and save your UID and API key by running

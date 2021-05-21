@@ -5,7 +5,6 @@ import jax.random as jr
 import tensorflow_probability
 tfp = tensorflow_probability.experimental.substrates.jax
 tfk = tfp.math.psd_kernels
-import sys; sys.path.insert(0, '..')
 from riemannianvectorgp.sparse_gp import SparseGaussianProcess
 from riemannianvectorgp.manifold import EmbeddedS2
 from riemannianvectorgp.kernel import (
