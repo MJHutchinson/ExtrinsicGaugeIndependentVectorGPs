@@ -15,6 +15,7 @@ from riemannianvectorgp.kernel import (
 )
 from riemannianvectorgp.utils import train_sparse_gp, GlobalRNG
 from examples.wind_interpolation.utils import deg2rad, refresh_kernel
+import matplotlib.pyplot as plt
 import click
 import pickle
 
@@ -22,8 +23,8 @@ def _get_v_cond(ds, date, climatology):
     u = ds.u10.sel(time=date)
     v = ds.v10.sel(time=date)
     week_number = u['time'].dt.isocalendar().week
-    u_mean = climatology['u'][week_number]
-    v_mean = climatology['v'][week_number]
+    u_mean = climatology['u'][week_number-1]
+    v_mean = climatology['v'][week_number-1]
     u_anomaly = u.values - u_mean
     v_anomaly = v.values - v_mean
     u_anomaly, v_anomaly = u_anomaly.transpose().flatten(), v_anomaly.transpose().flatten()
@@ -33,7 +34,7 @@ def _get_v_cond(ds, date, climatology):
 
 @click.command()
 @click.option('--logdir', default='log', type=str)
-@click.option('--samples', '-s', default=50, type=int)
+@click.option('--samples', '-s', default=100, type=int)
 @click.option('--epochs', '-e', default=500, type=int)
 @click.option('--geometry', '-g', default='r2', type=click.Choice(['r2', 's2']))
 def main(logdir, samples, epochs, geometry):
@@ -119,8 +120,19 @@ def main(logdir, samples, epochs, geometry):
         log_length_scales.append(log_length_scale)
         log_amplitudes.append(log_amplitude)
 
+    log_length_scales = np.stack(log_length_scales)
+    log_amplitudes = np.stack(log_amplitudes)
+
+    plt.figure()
+    plt.hist(log_length_scales)
+    plt.savefig("figs/"+geometry+"log_length_scale_distribution.png")
+
+    plt.figure()
+    plt.hist(log_amplitudes)
+    plt.savefig("figs/"+geometry+"log_amplitude_distribution.png")
+
     with open(logdir+'/'+geometry+'_params_pretrained.pickle', "wb") as f:
-        pickle.dump({'log_length_scale': np.stack(log_length_scales), 'log_amplitude': np.stack(log_amplitudes)}, f)
+        pickle.dump({'log_length_scale': log_length_scales, 'log_amplitude': log_amplitudes}, f)
 
 
 if __name__ == '__main__':

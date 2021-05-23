@@ -7,19 +7,24 @@ import jax.random as jr
 import tensorflow_probability
 tfp = tensorflow_probability.experimental.substrates.jax
 tfk = tfp.math.psd_kernels
-from functools import partial
-from dataclasses import dataclass
 from riemannianvectorgp.sparse_gp import SparseGaussianProcess, SparseGaussianProcessParameters, SparseGaussianProcessState
 from riemannianvectorgp.manifold import EmbeddedS2
 from riemannianvectorgp.kernel import (
     MaternCompactRiemannianManifoldKernel,
     ManifoldProjectionVectorKernel,
     ScaledKernel,
-    TFPKernel,
-    AbstractKernel
+    TFPKernel
 )
-from riemannianvectorgp.utils import train_sparse_gp, GlobalRNG
-from examples.wind_interpolation.utils import deg2rad, rad2deg, refresh_kernel, GetDataAlongSatelliteTrack
+from riemannianvectorgp.utils import GlobalRNG
+from examples.wind_interpolation.utils import (
+    deg2rad,
+    rad2deg,
+    refresh_kernel,
+    GetDataAlongSatelliteTrack,
+    Hyperprior,
+    SparseGaussianProcessWithHyperprior
+    )
+from examples.wind_interpolation.plot import spatial_plot as plot
 from skyfield.api import load, EarthSatellite
 from copy import deepcopy
 import click
@@ -28,61 +33,6 @@ import matplotlib.pyplot as plt
 import cartopy
 import cartopy.crs as ccrs
 import xesmf as xe
-
-
-class Hyperprior():
-    def __init__(self):
-        self.amplitude = None
-        self.length_scale = None
-
-    @dataclass
-    class mean_and_std:
-        mean: float
-        std: float
-
-    def set_amplitude_prior(self, mean, std):
-        self.amplitude = self.mean_and_std(mean, std)
-
-    def set_length_scale_prior(self, mean, std):
-        self.length_scale = self.mean_and_std(mean, std)
-
-
-class SparseGaussianProcessWithHyperprior(SparseGaussianProcess):
-    def __init__(
-        self,
-        kernel: AbstractKernel,
-        num_inducing: int,
-        num_basis: int,
-        num_samples: int,
-        hyperprior: Hyperprior,
-        geometry: str,
-    ):
-        super().__init__(kernel, num_inducing, num_basis, num_samples)
-        if geometry != 'r2' and geometry != 's2':
-            raise ValueError("geometry must be either 'r2' or 's2'.")
-        self._hyperprior = hyperprior
-        self._geometry = geometry
-
-    @partial(jax.jit, static_argnums=(0,))
-    def hyperprior(
-        self,
-        params: SparseGaussianProcessParameters,
-        state: SparseGaussianProcessState,
-    ) -> jnp.ndarray:
-        """Returns the log hyperprior regularization term of the GP."""
-        # Amplitude regularizer
-        amp_mean = self._hyperprior.amplitude.mean
-        amp_std = self._hyperprior.amplitude.std
-        amp_reg = (params.kernel_params.log_amplitude - amp_mean)**2 / (2*amp_std**2)
-        # Length scale regularizer
-        scale_mean = self._hyperprior.length_scale.mean
-        scale_std = self._hyperprior.length_scale.std
-        if self._geometry == 'r2':
-            log_length_scale = params.kernel_params.sub_kernel_params.log_length_scales
-        elif self._geometry == 's2':
-            log_length_scale = params.kernel_params.sub_kernel_params.log_length_scale
-        scale_reg = (log_length_scale - scale_mean)**2 / (2*scale_std**2)
-        return amp_reg + scale_reg
 
 
 def train_sparse_gp_with_fixed_inducing_points(
@@ -128,77 +78,12 @@ def train_sparse_gp_with_fixed_inducing_points(
     return gp_params, gp_state, (debug_params, debug_states, debug_keys, losses)
 
 
-def plot(fname1, fname2, gp, params, state, m, m_cond, v_cond, mesh, lon_size, lat_size):
-    prediction = gp(params, state, m)
-
-    plt.figure(figsize=(10, 5))
-    ax = plt.axes(projection=ccrs.PlateCarree())
-    ax.add_feature(cartopy.feature.LAND, zorder=0)
-    ax.coastlines()
-    scale = 250
-    
-    mean = prediction.mean(axis=0)
-    std = jnp.sqrt(((prediction - mean)**2).mean(axis=0).sum(axis=-1))
-    plt.quiver(rad2deg(m[:,1]),
-               rad2deg(m[:,0], offset=jnp.pi/2),
-               mean[:,1],
-               mean[:,0],
-               alpha=0.5,
-               color='blue',
-               scale=scale,
-               width=0.003,
-               headwidth=3,
-               zorder=2)
-
-    plt.quiver(rad2deg(m_cond[:,1]),
-               rad2deg(m_cond[:,0], offset=jnp.pi/2),
-               v_cond[:,1],
-               v_cond[:,0],
-               color='red',
-               scale=scale,
-               width=0.003,
-               headwidth=3,
-               zorder=3)
-
-    # Plot satellite trajectories (we split it in two parts to respect periodicity)
-    def _where_is_jump(x):
-        for i in range(1,len(x)):
-            if np.abs(x[i-1] - x[i]) > 180:
-                return i
-
-    idx = _where_is_jump(rad2deg(m_cond[:, 1]))
-
-    x1 = deepcopy(rad2deg(m_cond[:idx+1, 1]))
-    y1 = rad2deg(m_cond[:idx+1, 0], offset=jnp.pi/2)
-    x1[idx] = x1[idx] - 360
-
-    x2 = deepcopy(rad2deg(m_cond[idx-1:, 1]))
-    y2 = rad2deg(m_cond[idx-1:, 0], offset=jnp.pi/2)
-    x2[0] = x2[0] + 360
-
-    plt.plot(x1, y1, c='r', alpha=0.5, linewidth=2)
-    plt.plot(x2, y2, c='r', alpha=0.5, linewidth=2)
-
-    plt.savefig(fname1)
-
-    std = std.reshape(lon_size, lat_size).transpose()
-    fig = plt.figure(figsize=(10,5))
-    ax = plt.axes(projection=ccrs.PlateCarree())
-    ax.coastlines()
-    plt.contourf(*mesh, std, levels=30, zorder=1)
-
-    plt.plot(x1, y1, c='r', alpha=0.5, linewidth=2)
-    plt.plot(x2, y2, c='r', alpha=0.5, linewidth=2)
-
-    plt.title("posterior std")
-    plt.savefig(fname2)
-
-
 @click.command()
 @click.option('--logdir', default='log', type=str)
 @click.option('--geometry', '-g', default='r2', type=click.Choice(['r2','s2']))
 @click.option('--epochs', '-e', default=500, type=int)
-def main(logdir, epochs, geometry):
+@click.option('--train/--no-train', default=True, type=bool)
+def main(logdir, epochs, geometry, train):
     rng = GlobalRNG()
 
     year = 2019
@@ -245,71 +130,92 @@ def main(logdir, epochs, geometry):
     m_cond, v_cond = GetDataAlongSatelliteTrack(ds, aeolus, climatology, year, month, day, hour)
     noises_cond = jnp.ones_like(v_cond) * 1.7
 
-    # Set up kernel
-    if geometry == 'r2':
-        kernel = ScaledKernel(TFPKernel(tfk.ExponentiatedQuadratic, 2, 2))
-    elif geometry == 's2':
-        S2 = EmbeddedS2(1.0)
-        kernel = ScaledKernel(
-            ManifoldProjectionVectorKernel(
-                MaternCompactRiemannianManifoldKernel(1.5, S2, 144), S2
-            )
-        ) # 144 is the maximum number of basis functions we have implemented
+    if train:
+        # Set up kernel
+        if geometry == 'r2':
+            kernel = ScaledKernel(TFPKernel(tfk.ExponentiatedQuadratic, 2, 2))
+        elif geometry == 's2':
+            S2 = EmbeddedS2(1.0)
+            kernel = ScaledKernel(
+                ManifoldProjectionVectorKernel(
+                    MaternCompactRiemannianManifoldKernel(1.5, S2, 144), S2
+                )
+            ) # 144 is the maximum number of basis functions we have implemented
 
-    # Set up hyperprior regularizer
-    with open(logdir+'/'+geometry+'_params.pickle', "rb") as f:
-        params_dict = pickle.load(f)
+        # Set up hyperprior regularizer
+        with open(logdir+'/'+geometry+'_params_pretrained.pickle', "rb") as f:
+            params_dict = pickle.load(f)
 
-    hyperprior_amplitudes = params_dict['log_amplitude']
-    hyperprior_length_scales = params_dict['log_length_scale']
+        hyperprior_amplitudes = params_dict['log_amplitude']
+        hyperprior_length_scales = params_dict['log_length_scale']
 
-    hyperprior = Hyperprior()
-    hyperprior.set_amplitude_prior(hyperprior_amplitudes.mean(), hyperprior_amplitudes.std())
-    hyperprior.set_length_scale_prior(hyperprior_length_scales.mean(), hyperprior_length_scales.std())
+        hyperprior = Hyperprior()
+        hyperprior.set_amplitude_prior(hyperprior_amplitudes.mean(), hyperprior_amplitudes.std())
+        hyperprior.set_length_scale_prior(hyperprior_length_scales.mean(), hyperprior_length_scales.std())
 
-    # Set up sparse GP
-    sparse_gp = SparseGaussianProcessWithHyperprior(
-                    kernel=kernel,
-                    num_inducing=m_cond.shape[0],
-                    num_basis=144,
-                    num_samples=100,
-                    hyperprior=hyperprior, 
-                    geometry=geometry)
+        # Set up sparse GP
+        sparse_gp = SparseGaussianProcessWithHyperprior(
+                        kernel=kernel,
+                        num_inducing=m_cond.shape[0],
+                        num_basis=144,
+                        num_samples=100,
+                        hyperprior=hyperprior, 
+                        geometry=geometry)
 
-    # Set initial length scale
-    init_log_length_scale = hyperprior.length_scale.mean
-    init_log_amplitude = hyperprior.amplitude.mean
+        # Set initial length scale
+        init_log_length_scale = hyperprior.length_scale.mean
+        init_log_amplitude = hyperprior.amplitude.mean
 
-    # Initialize parameters and state
-    params, state = sparse_gp.init_params_with_state(next(rng))
-    kernel_params = refresh_kernel(next(rng), kernel, m_cond, geometry, init_log_length_scale, init_log_amplitude)
+        # Initialize parameters and state
+        params, state = sparse_gp.init_params_with_state(next(rng))
+        kernel_params = refresh_kernel(next(rng), kernel, m_cond, geometry, init_log_length_scale, init_log_amplitude)
 
-    params = params._replace(kernel_params=kernel_params)
-    params = sparse_gp.set_inducing_points(params, m_cond, v_cond, noises_cond)
+        params = params._replace(kernel_params=kernel_params)
+        params = sparse_gp.set_inducing_points(params, m_cond, v_cond, noises_cond)
 
 
-    state = sparse_gp.resample_prior_basis(params, state, next(rng))
-    state = sparse_gp.randomize(params, state, next(rng))
+        state = sparse_gp.resample_prior_basis(params, state, next(rng))
+        state = sparse_gp.randomize(params, state, next(rng))
 
-    # Train sparse GP
-    params, state, _ = train_sparse_gp_with_fixed_inducing_points(
-                        sparse_gp,
-                        params,
-                        state,
-                        m_cond,
-                        v_cond,
-                        rng,
-                        geometry,
-                        epochs=epochs)
+        # Train sparse GP
+        params, state, _ = train_sparse_gp_with_fixed_inducing_points(
+                            sparse_gp,
+                            params,
+                            state,
+                            m_cond,
+                            v_cond,
+                            rng,
+                            geometry,
+                            epochs=epochs)
 
-    # Plot posterior mean
+        # Save params and state
+        with open(logdir+"/"+geometry+"_params_and_state_for_spatial_interpolation.pickle", "wb") as f:
+            pickle.dump({"params": params, "state": state}, f)
+
+        # Save sparse gp
+        with open(logdir+"/"+geometry+"_sparse_gp_for_spatial_interpolation.pickle", "wb") as f:
+            pickle.dump(sparse_gp, f)
+    else:
+        # Load params and state
+        with open(logdir+"/"+geometry+"_params_and_state_for_spatial_interpolation.pickle", "rb") as f:
+            params_and_state = pickle.load(f)
+
+        params = params_and_state['params']
+        state = params_and_state['state']
+
+        # Load sparse gp
+        with open(logdir+"/"+geometry+"_sparse_gp_for_spatial_interpolation.pickle", "rb") as f:
+            sparse_gp = pickle.load(f)
+
+    final_loss, _ = sparse_gp.loss(params, state, next(rng), m_cond, v_cond, m_cond.shape[0])
+    print("-"*10)
+    print(f"Final loss: {final_loss}")
+    print("-"*10)
+
+    # Plot
     fname1 = "figs/"+geometry+"_sparse_gp_mean.png"
     fname2 = "figs/"+geometry+"_sparse_gp_std.png"
     plot(fname1, fname2, sparse_gp, params, state, m, m_cond, v_cond, mesh, lon_size, lat_size)
-
-    # Save params and state
-    with open(logdir+"/"+geometry+"_params_and_state_for_spatial_interpolation.pickle", "wb") as f:
-        pickle.dump({"params": params, "state": state}, f)
 
 
 if __name__ == '__main__':
