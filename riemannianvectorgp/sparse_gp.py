@@ -372,10 +372,7 @@ class SparseGaussianProcess:
         )
 
         return (
-            logdet_term
-            - (OD * ID * M)
-            + trace_term
-            + reparameterized_quadratic_form_term
+            logdet_term - (OD * M) + trace_term + reparameterized_quadratic_form_term
         ) / 2
 
     @partial(jax.jit, static_argnums=(0,))
