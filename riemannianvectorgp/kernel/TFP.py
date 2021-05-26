@@ -96,6 +96,69 @@ class TFPKernel(AbstractRFFKernel):
                     ),
                 )
             )
+        elif self.tfp_class == tfk.MaternOneHalf:
+            frequency = jr.t(
+                k1,
+                0.5 * 2,
+                (
+                    num_samples,
+                    self.output_dimension,
+                    self.input_dimension,
+                ),
+            )
+            phase = (
+                2
+                * jnp.pi
+                * jr.uniform(
+                    k2,
+                    (
+                        num_samples,
+                        self.output_dimension,
+                    ),
+                )
+            )
+        elif self.tfp_class == tfk.MaternThreeHalves:
+            frequency = jr.t(
+                k1,
+                1.5 * 2,
+                (
+                    num_samples,
+                    self.output_dimension,
+                    self.input_dimension,
+                ),
+            )
+            phase = (
+                2
+                * jnp.pi
+                * jr.uniform(
+                    k2,
+                    (
+                        num_samples,
+                        self.output_dimension,
+                    ),
+                )
+            )
+        elif self.tfp_class == tfk.MaternFiveHalves:
+            frequency = jr.t(
+                k1,
+                2.5 * 2,
+                (
+                    num_samples,
+                    self.output_dimension,
+                    self.input_dimension,
+                ),
+            )
+            phase = (
+                2
+                * jnp.pi
+                * jr.uniform(
+                    k2,
+                    (
+                        num_samples,
+                        self.output_dimension,
+                    ),
+                )
+            )
         else:
             raise NotImplementedError(
                 f"Fourier features not implemented for {self.tfp_class}"

@@ -1,4 +1,5 @@
 import jax
+import jax.numpy as jnp
 import optax
 
 
@@ -28,3 +29,12 @@ def train_sparse_gp(
         debug_keys.append(rng.key)
 
     return gp_params, gp_state, (debug_params, debug_states, debug_keys, losses)
+
+
+def normalise_scaled_kernel(kernel, kernel_params, locations):
+    kernel_params = kernel_params._replace(
+        log_amplitude=-jnp.log(
+            kernel.matrix(kernel_params, locations, locations)[0, 0, 0, 0]
+        )
+    )
+    return kernel_params

@@ -101,6 +101,6 @@ class ManifoldProjectionVectorKernel(AbstractKLKernel):
     ) -> jnp.ndarray:
         basis_functions = self.euclidean_vector_kernel.basis_functions(params, state, x)
         p = self.manifold.projection_matrix(x)
-        print(basis_functions.shape)
-        print(p.shape)
+        # print(basis_functions.shape)
+        # print(p.shape)
         return jnp.einsum("...nbem,...nem->...nbme", basis_functions, p)
