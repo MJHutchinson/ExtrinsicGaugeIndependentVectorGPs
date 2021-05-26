@@ -7,24 +7,21 @@ import jax.random as jr
 import tensorflow_probability
 tfp = tensorflow_probability.experimental.substrates.jax
 tfk = tfp.math.psd_kernels
+from functools import partial
+from dataclasses import dataclass
 from riemannianvectorgp.sparse_gp import SparseGaussianProcess, SparseGaussianProcessParameters, SparseGaussianProcessState
+from riemannianvectorgp.gp import GaussianProcess
 from riemannianvectorgp.manifold import EmbeddedS2
 from riemannianvectorgp.kernel import (
     MaternCompactRiemannianManifoldKernel,
     ManifoldProjectionVectorKernel,
     ScaledKernel,
-    TFPKernel
+    TFPKernel,
+    ProductKernel
 )
-from riemannianvectorgp.utils import GlobalRNG
-from examples.wind_interpolation.utils import (
-    deg2rad,
-    rad2deg,
-    refresh_kernel,
-    GetDataAlongSatelliteTrack,
-    Hyperprior,
-    SparseGaussianProcessWithHyperprior
-    )
-from examples.wind_interpolation.plot import spatial_plot as plot
+from riemannianvectorgp.utils import train_sparse_gp, GlobalRNG
+from examples.wind_interpolation.utils import deg2rad, rad2deg, refresh_kernel, GetDataAlongSatelliteTrack
+from examples.wind_interpolation.plot import space_time_plot as plot
 from skyfield.api import load, EarthSatellite
 from copy import deepcopy
 import click
@@ -34,9 +31,8 @@ import cartopy
 import cartopy.crs as ccrs
 import xesmf as xe
 
-
 def train_sparse_gp_with_fixed_inducing_points(
-    gp, gp_params, gp_state, m_cond, v_cond, rng, geometry, epochs=300, b1=0.9, b2=0.999, eps=1e-8, lr=0.01
+    gp, gp_params, gp_state, m_cond, v_cond, rng, epochs=300, b1=0.9, b2=0.999, eps=1e-8, lr=0.01
 ):
     opt = optax.chain(optax.scale_by_adam(b1=b1, b2=b2, eps=eps), optax.scale(-lr))
     opt_state = opt.init(gp_params)
@@ -60,15 +56,8 @@ def train_sparse_gp_with_fixed_inducing_points(
         (updates, opt_state) = opt.update(grads_, opt_state)
         gp_params = optax.apply_updates(gp_params, updates)
 
-        if geometry == 'r2':
-            log_length_scale = gp_params.kernel_params.sub_kernel_params.log_length_scales
-        elif geometry == 's2':
-            log_length_scale = gp_params.kernel_params.sub_kernel_params.log_length_scale
-
         if i <= 10 or i % 20 == 0:
-            print(i, "Loss:", train_loss,
-                     "Length scale:", log_length_scale,
-                     "Amplitude:", gp_params.kernel_params.log_amplitude)
+            print(i, "Loss:", train_loss)
 
         losses.append(train_loss)
         debug_params.append(gp_params)
@@ -80,18 +69,17 @@ def train_sparse_gp_with_fixed_inducing_points(
 
 @click.command()
 @click.option('--logdir', default='log', type=str)
-@click.option('--geometry', '-g', default='r2', type=click.Choice(['r2','s2']))
 @click.option('--epochs', '-e', default=500, type=int)
+@click.option('--geometry', '-g', default='r2', type=click.Choice(['r2','s2']))
+@click.option('--num-hours',  '-h', default=6, type=int)
 @click.option('--train/--no-train', default=True, type=bool)
-def main(logdir, epochs, geometry, train):
+def main(logdir, epochs, geometry, num_hours, train):
     rng = GlobalRNG()
 
     year = 2019
     month = 1
     day = 1
     hour = 0
-    min = 0
-    date = f"{year}-{month}-{day} {hour}:{min}"
 
     # Get Aeolus trajectory data from TLE set
     ts = load.timescale()
@@ -118,74 +106,79 @@ def main(logdir, epochs, geometry, train):
     # Get input locations
     lon = ds.isel(time=0).lon
     lat = ds.isel(time=0).lat
-
+    time = np.arange(num_hours)
     mesh = np.meshgrid(lon, lat) # create mesh for plotting later
     lon_size = lon.shape[0]
     lat_size = lat.shape[0]
-    lat, lon = jnp.meshgrid(deg2rad(lat, offset=jnp.pi/2), deg2rad(lon)) # Reparametrise as lat=(0, pi) and lon=(0, 2pi) 
+    # Reparametrise as lat=(0, pi) and lon=(0, 2pi)
+    lat = deg2rad(lat, offset=jnp.pi/2)
+    lon = deg2rad(lon)
+
+    lat, lon, time = jnp.meshgrid(lat, lon, time)
+    lat = lat.reshape(lat_size*lon_size, num_hours).transpose()
+    lon = lon.reshape(lat_size*lon_size, num_hours).transpose()
+    time = time.reshape(lat_size*lon_size, num_hours).transpose()
     lat = lat.flatten()
     lon = lon.flatten()
-    m = jnp.stack([lat, lon], axis=-1)
+    time = time.flatten()
+    m = jnp.stack([lat, lon, time], axis=-1)
 
     # Get conditioning points and values
-    m_cond, v_cond = GetDataAlongSatelliteTrack(
-                        ds,
-                        aeolus,
-                        year,
-                        month,
-                        day,
-                        hour,
-                        anomaly=True,
-                        climatology=climatology)
-
+    m_cond, v_cond = GetDataAlongSatelliteTrack(ds,
+                                                aeolus,
+                                                year,
+                                                month,
+                                                day,
+                                                hour,
+                                                num_hours=num_hours,
+                                                anomaly=True,
+                                                climatology=climatology,
+                                                space_time=True)
     noises_cond = jnp.ones_like(v_cond) * 1.7
 
     if train:
         # Set up kernel
         if geometry == 'r2':
-            kernel = ScaledKernel(TFPKernel(tfk.ExponentiatedQuadratic, 2, 2))
+            space_kernel = TFPKernel(tfk.ExponentiatedQuadratic, 2, 2)
         elif geometry == 's2':
             S2 = EmbeddedS2(1.0)
-            kernel = ScaledKernel(
-                ManifoldProjectionVectorKernel(
+            space_kernel = ManifoldProjectionVectorKernel(
                     MaternCompactRiemannianManifoldKernel(1.5, S2, 144), S2
-                )
-            ) # 144 is the maximum number of basis functions we have implemented
+                ) # 144 is the maximum number of basis functions we have implemented
 
-        # Set up hyperprior regularizer
-        with open(logdir+'/'+geometry+'_params_pretrained.pickle', "rb") as f:
-            params_dict = pickle.load(f)
+        time_kernel = TFPKernel(tfk.ExponentiatedQuadratic, 1, 1)
 
-        hyperprior_amplitudes = params_dict['log_amplitude']
-        hyperprior_length_scales = params_dict['log_length_scale']
-
-        hyperprior = Hyperprior()
-        hyperprior.set_amplitude_prior(hyperprior_amplitudes.mean(), hyperprior_amplitudes.std())
-        hyperprior.set_length_scale_prior(hyperprior_length_scales.mean(), hyperprior_length_scales.std())
+        kernel = ScaledKernel(ProductKernel(space_kernel, time_kernel)) # Space-time kernel
 
         # Set up sparse GP
-        sparse_gp = SparseGaussianProcessWithHyperprior(
+        sparse_gp = SparseGaussianProcess(
                         kernel=kernel,
                         num_inducing=m_cond.shape[0],
-                        num_basis=144,
-                        num_samples=100,
-                        hyperprior=hyperprior, 
-                        geometry=geometry)
-
-        # Set initial length scale
-        init_log_length_scale = hyperprior.length_scale.mean
-        init_log_amplitude = hyperprior.amplitude.mean
+                        num_basis=67,
+                        num_samples=20)
 
         # Initialize parameters and state
+        kernel_params = kernel.init_params(next(rng))
+        product_params = kernel_params.sub_kernel_params
+        space_params = product_params.sub_kernel_params[0]
+        if geometry == "r2":
+            space_params = space_params._replace(log_length_scales=jnp.log(0.3))
+        elif geometry == "s2":
+            space_params = space_params._replace(log_length_scale=jnp.log(0.3))
+        time_params = product_params.sub_kernel_params[1]
+        time_params = time_params._replace(log_length_scales=jnp.log(1.0))
+        product_params = product_params._replace(sub_kernel_params=[space_params, time_params])
+        kernel_params = kernel_params._replace(sub_kernel_params=product_params)
+        kernel_params = kernel_params._replace(log_amplitude=-jnp.log(kernel.matrix(kernel_params, m, m)[0, 0, 0, 0]))
+
         params, state = sparse_gp.init_params_with_state(next(rng))
-        kernel_params = refresh_kernel(next(rng), kernel, m_cond, geometry, init_log_length_scale, init_log_amplitude)
 
         params = params._replace(kernel_params=kernel_params)
         params = sparse_gp.set_inducing_points(params, m_cond, v_cond, noises_cond)
 
-
         state = sparse_gp.resample_prior_basis(params, state, next(rng))
         state = sparse_gp.randomize(params, state, next(rng))
+        
 
         # Train sparse GP
         params, state, _ = train_sparse_gp_with_fixed_inducing_points(
@@ -195,28 +188,39 @@ def main(logdir, epochs, geometry, train):
                             m_cond,
                             v_cond,
                             rng,
-                            geometry,
                             epochs=epochs)
 
         # Save params and state
-        with open(logdir+"/"+geometry+"_params_and_state_for_spatial_interpolation.pickle", "wb") as f:
+        with open(logdir+"/"+geometry+"_params_and_state_for_space_time_interpolation.pickle", "wb") as f:
             pickle.dump({"params": params, "state": state}, f)
 
         # Save sparse gp
-        with open(logdir+"/"+geometry+"_sparse_gp_for_spatial_interpolation.pickle", "wb") as f:
+        with open(logdir+"/"+geometry+"_sparse_gp_for_space_time_interpolation.pickle", "wb") as f:
             pickle.dump(sparse_gp, f)
+
+        # Print results
+        kernel_params = params.kernel_params
+        product_params = kernel_params.sub_kernel_params
+        space_params = product_params.sub_kernel_params[0]
+        time_params = product_params.sub_kernel_params[1]
+        if geometry == "r2":
+            print("spatial length scale:", space_params.log_length_scales)
+        elif geometry == "s2":
+            print("spatial length scale:", space_params.log_length_scale)
+        print("temporal length scale:", time_params.log_length_scales)
+        print("amplitude:", kernel_params.log_amplitude)
+
     else:
         # Load params and state
-        with open(logdir+"/"+geometry+"_params_and_state_for_spatial_interpolation.pickle", "rb") as f:
+        with open(logdir+"/"+geometry+"_params_and_state_for_space_time_interpolation.pickle", "rb") as f:
             params_and_state = pickle.load(f)
 
         params = params_and_state['params']
         state = params_and_state['state']
 
         # Load sparse gp
-        with open(logdir+"/"+geometry+"_sparse_gp_for_spatial_interpolation.pickle", "rb") as f:
+        with open(logdir+"/"+geometry+"_sparse_gp_for_space_time_interpolation.pickle", "rb") as f:
             sparse_gp = pickle.load(f)
-
 
     final_loss, _ = sparse_gp.loss(params, state, next(rng), m_cond, v_cond, m_cond.shape[0])
     print("-"*10)
@@ -224,24 +228,12 @@ def main(logdir, epochs, geometry, train):
     print("-"*10)
 
     # Plot
-    fname1 = "figs/"+geometry+"_sparse_gp_mean.png"
-    fname2 = "figs/"+geometry+"_sparse_gp_std.png"
-    m_cond, v_cond, mean = GetDataAlongSatelliteTrack(
-                            ds,
-                            aeolus,
-                            year,
-                            month,
-                            day,
-                            hour,
-                            return_mean=True,
-                            climatology=climatology)
-    
-    prediction = sparse_gp(params, state, m) + mean
+    fname1 = "figs/"+geometry+"_sparse_gp_mean_spacetime.png"
+    fname2 = "figs/"+geometry+"_sparse_gp_std_spacetime.png"
+    prediction = sparse_gp(params, state, m)
 
-    plot(fname1, fname2, m, prediction, m_cond, v_cond, mesh, lon_size, lat_size)
+    plot(fname1, fname2, m, prediction, m_cond, v_cond, num_hours)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
-
-

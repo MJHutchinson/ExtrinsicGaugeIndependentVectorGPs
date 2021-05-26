@@ -34,8 +34,8 @@ def _get_v_cond(ds, date, climatology):
 
 @click.command()
 @click.option('--logdir', default='log', type=str)
-@click.option('--samples', '-s', default=100, type=int)
-@click.option('--epochs', '-e', default=500, type=int)
+@click.option('--samples', '-s', default=250, type=int)
+@click.option('--epochs', '-e', default=800, type=int)
 @click.option('--geometry', '-g', default='r2', type=click.Choice(['r2', 's2']))
 def main(logdir, samples, epochs, geometry):
     rng = GlobalRNG()
@@ -84,7 +84,7 @@ def main(logdir, samples, epochs, geometry):
     init_inducing_locations = jnp.stack([phi_init, theta_init], axis=-1)
 
     # Set initial length scale
-    init_length_scale = 0.2
+    init_length_scale = 0.15
     init_log_length_scale = jnp.log(init_length_scale)
 
     log_length_scales, log_amplitudes = [], []

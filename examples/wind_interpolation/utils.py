@@ -2,10 +2,11 @@ import numpy as np
 import jax
 import jax.numpy as jnp
 import xarray as xr
-from typing import List
+from typing import List, Union
 from skyfield.api import wgs84, load, EarthSatellite
 from riemannianvectorgp.sparse_gp import SparseGaussianProcess, SparseGaussianProcessParameters, SparseGaussianProcessState
 from riemannianvectorgp.kernel import AbstractKernel
+from examples.wind_interpolation import climatology
 from scipy.interpolate import interp2d
 from dataclasses import dataclass
 from functools import partial
@@ -89,15 +90,18 @@ class SparseGaussianProcessWithHyperprior(SparseGaussianProcess):
 def GetDataAlongSatelliteTrack(
     ds: xr.Dataset,
     satellite: EarthSatellite,
-    climatology: np.ndarray,
     year: int,
     month: int,
     day: int,
     hour: int,
     num_hours: int=1,
+    anomaly: bool=False,
+    return_mean: bool=False,
+    climatology: Union[np.ndarray, None]=None,
     space_time: bool=False) -> List[jnp.ndarray]:
-    """Generate wind anomaly data along the trajectories of Aeolus (satellite)
-        More information about the Aeolus satellite: https://www.n2yo.com/satellite/?s=43600 
+    """Generate wind data along the trajectories of Aeolus (satellite)
+        More information about the Aeolus satellite: https://www.n2yo.com/satellite/?s=43600
+        https://www.ecmwf.int/sites/default/files/elibrary/2016/16851-esa-adm-aeolus-doppler-wind-lidar-mission-status-and-validation-strategy.pdf
     """
     date = f"{year}-{month}-{day}"
     lon = deg2rad(ds.isel(time=0).lon.values) # Range: [0, 2*pi]
@@ -107,14 +111,24 @@ def GetDataAlongSatelliteTrack(
     week_numbers = u['time'].dt.isocalendar().week
     u, v = u.values, v.values # Convert to numpy array
 
-    ts = load.timescale()
-    location, wind = [], []
-    for t in range(num_hours):
+    def compute_mean(climatology, t):
+        if climatology is None:
+            climatology.weekly_climatology()
+            climatology = np.load("../../datasets/climatology/weekly_climatology.npz")
         # Compute difference from weekly climatology
         u_mean = climatology['u'][week_numbers[t]-1]
         v_mean = climatology['v'][week_numbers[t]-1]
-        u_anomaly = u[hour+t] - u_mean
-        v_anomaly = v[hour+t] - v_mean
+        return u_mean, v_mean
+
+    ts = load.timescale()
+    location, wind = [], []
+    for t in range(num_hours):
+        if anomaly:
+            u_mean, v_mean = compute_mean(climatology, t)
+            u_ = u[hour+t] - u_mean
+            v_ = v[hour+t] - v_mean
+        else:
+            u_, v_ = u[hour+t], v[hour+t]
 
         time_span = ts.utc(year, month, day, hour+t, range(0, 60))
         geocentric = satellite.at(time_span)
@@ -124,8 +138,8 @@ def GetDataAlongSatelliteTrack(
         lon_location = np.where(lon_location > 0, lon_location, 2*np.pi + lon_location) # Range: [0, 2pi]
         lat_location = subpoint.latitude.radians + jnp.pi/2 # Range: [0, pi]
 
-        u_interp = interp2d(lon, lat, u_anomaly, kind='linear')
-        v_interp = interp2d(lon, lat, v_anomaly, kind='linear')
+        u_interp = interp2d(lon, lat, u_, kind='linear')
+        v_interp = interp2d(lon, lat, v_, kind='linear')
         u_along_sat_track, v_along_sat_track = [], []
         for x, y in zip(lon_location, lat_location):
             u_along_sat_track.append(u_interp(x, y).item())
@@ -143,5 +157,16 @@ def GetDataAlongSatelliteTrack(
     if space_time:
         location = jnp.concatenate([location, time], axis=1)
 
-    return location, wind
+    if return_mean:
+        mean_list = []
+        for t in range(num_hours):
+            u_mean, v_mean = compute_mean(climatology, t)
+            u_mean = u_mean.transpose().flatten()
+            v_mean = v_mean.transpose().flatten()
+            mean_list.append(jnp.stack([v_mean, u_mean], axis=-1))
+        mean = jnp.concatenate(mean_list)
+        return location, wind, mean
+    
+    else:
+        return location, wind
 
