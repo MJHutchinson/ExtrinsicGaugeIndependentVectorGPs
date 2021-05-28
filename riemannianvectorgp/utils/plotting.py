@@ -1,6 +1,5 @@
 import math
 
-import torch
 
 import numpy as np
 import jax.numpy as jnp

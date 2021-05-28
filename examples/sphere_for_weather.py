@@ -5,7 +5,6 @@ get_ipython().run_line_magic("autoreload", "2")
 import math
 from functools import partial
 
-import torch
 import numpy as np
 import jax.numpy as jnp
 import jax.random as jr
