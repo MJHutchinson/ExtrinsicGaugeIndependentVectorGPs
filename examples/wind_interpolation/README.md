@@ -1,40 +1,17 @@
 # Instructions
 
 ## 1. Installing dependencies
-To run the experiments, you need to first install the following packages
-- netcdf4
-```
-pip install netcdf4
-```
-- xarray
-```
-pip install xarray
-```
-- skyfield
-```
-pip install skyfield
-```
-- dask
-```
-pip install dask
-```
-- xesmf
+To run the experiments, you need to first install the package in `requirements_experiments.py`. Additionally you will need to install `xesmf` and `cartopy`. These are more tricky to install. The reccomended method is via conda.
+
 ```
 conda install -c conda-forge xesmf
-```
-- cartopy
-```
 conda install -c conda-forge cartopy
-```
-- cdsapi
-```
-pip install cdsapi
 ```
 
 ## 2. Downloading the data
 The code to download the data are saved in `../../datasets`. Go there and run the following scripts
-- Run `era5.py` to download the ERA5 wind reanalysis data (this may take up to an hour depending on the queue)
-- Run `wind_dataset.py` to download the weatherbench historical wind data
+- Run `python era5.py` to download the ERA5 wind reanalysis data (this may take up to an hour depending on the queue)
+- Run `python wind_dataset.py` to download the weatherbench historical wind data
 
 ## 3. Running the experiment
 The main script to run the wind interpolation experiment in the paper is `gp_interpolation.py`. However before running this, you have to first compute the weekly historical average of the wind velocity field by running the script `climatology.py`, and then run `spatial_pretraining.py` to learn the length scale from the weatherbench data. In the latter, you have the option to specify the geometry of the base manifold by including the flag `-g`. So if you want to use a Euclidean kernel (which is the default), run
@@ -55,11 +32,7 @@ Examples:
 ```
 python gp_interpolation.py -l -1.65 -g s2 --no-plot-sphere
 ```
-1. The following fits a GP with pretrained log length scale using the Euclidean Matern kernel and plots the result on a sphere
+2. The following fits a GP with pretrained log length scale using the Euclidean Matern kernel and plots the result on a sphere
 ```
 python gp_interpolation.py -l -1.65 -g r2 --plot-sphere
 ```
-
-
-
-
