@@ -3,12 +3,33 @@
 ## 1. Installing dependencies
 To run the experiments, you need to first install the following packages
 - netcdf4
+```
+pip install netcdf4
+```
 - xarray
+```
+pip install xarray
+```
 - skyfield
+```
+pip install skyfield
+```
 - dask
+```
+pip install dask
+```
 - xesmf
+```
+conda install -c conda-forge xesmf
+```
 - cartopy
+```
+conda install -c conda-forge cartopy
+```
 - cdsapi
+```
+pip install cdsapi
+```
 
 ## 2. Downloading the data
 The code to download the data are saved in `../../datasets`. Go there and run the following scripts
