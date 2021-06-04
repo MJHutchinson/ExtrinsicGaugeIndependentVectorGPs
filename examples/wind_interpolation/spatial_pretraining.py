@@ -34,7 +34,7 @@ def _get_v_cond(ds, date, climatology):
 
 @click.command()
 @click.option('--logdir', default='log', type=str)
-@click.option('--samples', '-s', default=250, type=int)
+@click.option('--samples', '-s', default=150, type=int)
 @click.option('--epochs', '-e', default=800, type=int)
 @click.option('--geometry', '-g', default='r2', type=click.Choice(['r2', 's2']))
 def main(logdir, samples, epochs, geometry):
