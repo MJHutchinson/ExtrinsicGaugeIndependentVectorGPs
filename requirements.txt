@@ -3,3 +3,4 @@ jaxlib==0.1.*
 tensorflow==2.*
 tensorflow_probability==0.12.*
 optax==0.*
+einops
