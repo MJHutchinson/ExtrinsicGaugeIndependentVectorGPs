@@ -134,15 +134,6 @@ class ProductKernel(AbstractKernel):
                 KL_sub_weight_variances[..., :, np.newaxis, :]
                 * RFF_sub_weight_variances[..., np.newaxis, :, :]
             )
-<<<<<<< HEAD
-            print(f"{KL_sub_weight_variances.shape}")
-            print(f"{RFF_sub_weight_variances.shape}")
-            print(f"{sub_weight_variances.shape}")
-            sub_weight_variances = rearrange(
-                sub_weight_variances, "... M N O -> ... (M N) O"
-            )
-            print(f"{sub_weight_variances.shape}")
-=======
             # print(f"{KL_sub_weight_variances.shape=}")
             # print(f"{RFF_sub_weight_variances.shape=}")
             # print(f"{sub_weight_variances.shape=}")
@@ -150,7 +141,6 @@ class ProductKernel(AbstractKernel):
                 sub_weight_variances, "... M N O -> ... (M N) O"
             )
             # print(f"{sub_weight_variances.shape=}")
->>>>>>> main
         elif len(self.KL_indicies) > 0:
             sub_weight_variances = reduce(
                 operator.mul,

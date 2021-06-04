@@ -59,12 +59,13 @@ def main(logdir, samples, epochs, geometry):
 
     # Set up kernel
     if geometry == 'r2':
-        kernel = ScaledKernel(TFPKernel(tfk.ExponentiatedQuadratic, 2, 2))
+        # kernel = ScaledKernel(TFPKernel(tfk.ExponentiatedQuadratic, 2, 2))
+        kernel = ScaledKernel(TFPKernel(tfk.MaternThreeHalves, 2, 2))
     elif geometry == 's2':
         S2 = EmbeddedS2(1.0)
         kernel = ScaledKernel(
             ManifoldProjectionVectorKernel(
-                MaternCompactRiemannianManifoldKernel(1.5, S2, 144), S2
+                MaternCompactRiemannianManifoldKernel(3/2, S2, 144), S2
             )
         ) # 144 is the maximum number of basis functions we have implemented
 
