@@ -1,6 +1,6 @@
 # %%
-get_ipython().run_line_magic("load_ext", "autoreload")
-get_ipython().run_line_magic("autoreload", "2")
+#get_ipython().run_line_magic("load_ext", "autoreload")
+#get_ipython().run_line_magic("autoreload", "2")
 
 import math
 from functools import partial
@@ -20,7 +20,7 @@ tfk = tfp.math.psd_kernels
 
 import matplotlib.pyplot as plt
 
-from riemannianvectorgp.utils import GlobalRNG, mesh_to_polyscope
+#from riemannianvectorgp.utils import GlobalRNG, mesh_to_polyscope
 from riemannianvectorgp.gp import GaussianProcess
 from riemannianvectorgp.manifold import EmbeddedS2
 from riemannianvectorgp.kernel import (
@@ -29,13 +29,25 @@ from riemannianvectorgp.kernel import (
     ManifoldProjectionVectorKernel,
     ScaledKernel,
 )
+import sys
+
+class GlobalRNG:
+    def __init__(self, seed: int = np.random.randint(2147483647)):
+        self.key = jax.random.PRNGKey(seed)
+
+    def __iter__(self):
+        return self
+    
+    def __next__(self):
+        (ret_key, self.key) = jr.split(self.key)
+        return ret_key
 
 rng = GlobalRNG()
 
 import polyscope as ps
 
 # %%
-ps.init()
+#ps.init()
 
 # %%
 S2 = EmbeddedS2(1.0)
@@ -49,14 +61,14 @@ theta = theta.flatten()
 m = jnp.stack(
     [phi, theta], axis=-1
 )  ### NOTE this ordering, I can change it but it'll be a pain, its latitude, longitude
-x = S2.m_to_e(m)
+# x = S2.m_to_e(m)
 
-sphere_mesh = ps.register_surface_mesh(
-    "Sphere",
-    *mesh_to_polyscope(x.reshape((num_points, num_points, 3)), wrap_y=False),
-    color=(0.8, 0.8, 0.8)
-)
-sphere_mesh.set_vertex_tangent_basisX(S2.projection_matrix(m)[..., 0])
+# sphere_mesh = ps.register_surface_mesh(
+#     "Sphere",
+#     *mesh_to_polyscope(x.reshape((num_points, num_points, 3)), wrap_y=False),
+#     color=(0.8, 0.8, 0.8)
+# )
+# sphere_mesh.set_vertex_tangent_basisX(S2.projection_matrix(m)[..., 0])
 
 # %% ## Euclidean Scalar Kernel ##
 es_kernel = ScaledKernel(TFPKernel(tfk.ExponentiatedQuadratic, 1, 1))
@@ -103,11 +115,12 @@ plt.contourf(
 plt.gca().set_aspect("equal")
 plt.colorbar()
 plt.title("Scalar S2 Matern 3/2 kernel")
+
 # %% ## Euclidean Vector Kernel ##
 ev_kernel = ScaledKernel(TFPKernel(tfk.ExponentiatedQuadratic, 2, 2))
 ev_kernel_params = ev_kernel.init_params(next(rng))
 sub_kernel_params = ev_kernel_params.sub_kernel_params
-sub_kernel_params = sub_kernel_params._replace(log_length_scales=jnp.log(1))
+sub_kernel_params = sub_kernel_params._replace(log_length_scales=jnp.log(0.5))
 ev_kernel_params = ev_kernel_params._replace(sub_kernel_params=sub_kernel_params)
 ev_kernel_params = ev_kernel_params._replace(
     log_amplitude=-jnp.log(ev_kernel.matrix(ev_kernel_params, m, m)[0, 0, 0, 0])
@@ -148,6 +161,7 @@ plt.quiver(m[i, 0], m[i, 1], vec[0], vec[1], color="red")
 plt.gca().set_aspect("equal")
 # plt.colorbar()
 plt.title("Vector S2 Matern 3/2 kernel")
+
 # %% Draw a set to condition on
 n_cond = 10
 
@@ -160,6 +174,7 @@ plt.quiver(m_cond[:, 0], m_cond[:, 1], v_cond[:, 0], v_cond[:, 1], color="red")
 plt.gca().set_aspect("equal")
 plt.xlim(0, jnp.pi)
 plt.ylim(0, 2 * jnp.pi)
+
 # %% Euclidean vector GP
 ev_gp = GaussianProcess(ev_kernel)
 ev_gp_params, ev_gp_state = ev_gp.init_params_with_state(next(rng))
@@ -170,22 +185,38 @@ ev_gp_state = ev_gp.condition(ev_gp_params, m_cond, v_cond, noises_cond)
 scale = 50
 fig = plt.figure(figsize=(6, 6))
 mean, K = ev_gp(ev_gp_params, ev_gp_state, m)
+
 plt.quiver(
-    m_cond[:, 0],
     m_cond[:, 1],
+    m_cond[:, 0],
     v_cond[:, 0],
     v_cond[:, 1],
     color="red",
     scale=scale,
+    width=0.003,
+    headwidth=2,
     zorder=5,
 )
+
 plt.quiver(
-    m[:, 0], m[:, 1], mean[:, 0], mean[:, 1], color="blue", scale=scale, zorder=4
+    m[:, 1],
+    m[:, 0],
+    mean[:, 0],
+    mean[:, 1],
+    color="blue",
+    scale=scale,
+    width=0.003,
+    headwidth=2,
+    zorder=4
 )
 plt.gca().set_aspect("equal")
-plt.xlim(0, jnp.pi)
-plt.ylim(0, 2 * jnp.pi)
+#plt.xlim(0, jnp.pi)
+#plt.ylim(0, 2 * jnp.pi)
 plt.title("Vector Euclidean EQ kernel - Mean")
+
+plt.savefig("figs/example_plot.png")
+
+sys.exit()
 
 # %%
 samples = 10

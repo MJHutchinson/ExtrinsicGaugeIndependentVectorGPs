@@ -379,7 +379,7 @@ class SparseGaussianProcess:
     def hyperprior(
         self,
         params: SparseGaussianProcessParameters,
-        state: SparseGaussianProcessState,
+        state: SparseGaussianProcessState
     ) -> jnp.ndarray:
         """Returns the log hyperprior regularization term of the GP."""
         return jnp.zeros(())  # temporary
@@ -392,8 +392,9 @@ class SparseGaussianProcess:
         key: jnp.ndarray,
         x: jnp.ndarray,
         y: jnp.ndarray,
-        n_data: int,
+        n_data: int
     ) -> Tuple[jnp.ndarray, SparseGaussianProcessState]:
+
         state = self.randomize(params, state, key)
 
         kl = self.prior_kl(params, state)
