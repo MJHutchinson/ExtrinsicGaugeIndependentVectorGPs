@@ -164,7 +164,7 @@ def GetDataAlongSatelliteTrack(
             u_mean = u_mean.transpose().flatten()
             v_mean = v_mean.transpose().flatten()
             mean_list.append(jnp.stack([v_mean, u_mean], axis=-1))
-        mean = jnp.concatenate(mean_list)
+        mean = jnp.stack(mean_list)
         return location, wind, mean
     
     else:
