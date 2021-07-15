@@ -193,7 +193,7 @@ def main(logdir, geometry, num_hours, spacetime, plot_sphere):
     # Plot
     spacetime_ = "spacetime" if spacetime else "space"
     sphere_or_plane = "sphere" if plot_sphere else "plane"
-    fname = "figs/"+geometry+"_gp_"+spacetime_+"_"+sphere_or_plane+".png"
+    fname = "figs/"+geometry+"_gp_"+spacetime_+"_"+sphere_or_plane+".pdf"
     fname_vid = "figs/"+geometry+"_gp_"+spacetime_+"_"+sphere_or_plane+"_video.mp4"
 
     m_cond, v_cond, prior_mean = GetDataAlongSatelliteTrack(
@@ -215,8 +215,21 @@ def main(logdir, geometry, num_hours, spacetime, plot_sphere):
     v_cond = v_cond.reshape(num_hours, 60, 2) 
     K = gp(gp_params, gp_state, m_ext)[1]
 
-    # plot(fname, posterior_mean, K, m, m_cond, v_cond, num_hours, mesh, lon_size_ext, lat_size_ext, plot_sphere)
-    animate(fname_vid, posterior_mean, K, m, m_cond, v_cond, num_hours, mesh, lon_size_ext, lat_size_ext)
+    np.save("log/data_for_plots/posterior_mean.npy", np.asarray(posterior_mean))
+    var_norm = jnp.diag(jnp.trace(K, axis1=2, axis2=3)).reshape(lon_size_ext, lat_size_ext)
+    std_norm = jnp.sqrt(var_norm).transpose()
+    np.save("log/data_for_plots/posterior_std.npy", np.asarray(std_norm))
+    np.save("log/data_for_plots/m_cond.npy", np.asarray(m_cond))
+    np.save("log/data_for_plots/v_cond.npy", np.asarray(v_cond))
+    np.save("log/data_for_plots/test_locations.npy", np.asarray(m))
+    np.save("log/data_for_plots/mesh.npy", mesh)
+    import pdb; pdb.set_trace()
+
+    if spacetime:
+        animate(fname_vid, posterior_mean, K, m, m_cond, v_cond, num_hours, mesh, lon_size_ext, lat_size_ext)
+    else:
+        plot(fname, posterior_mean, K, m, m_cond, v_cond, num_hours, mesh, lon_size_ext, lat_size_ext, plot_sphere)
+    
 
     # Plot ground truth
 

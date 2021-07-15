@@ -30,7 +30,8 @@ def plot(
         scale = 200
         width = 0.006
         headwidth = 3
-        ax = plt.axes(projection=ccrs.Orthographic(-45, 45))
+        #ax = plt.axes(projection=ccrs.Orthographic(-45, 45))
+        ax = plt.axes(projection=ccrs.Orthographic(10, 30))
         crs = ccrs.RotatedPole(pole_longitude=180)
         ax.set_global()
         ax.gridlines()
@@ -44,13 +45,13 @@ def plot(
     ax.add_feature(cartopy.feature.LAND, zorder=0)
     ax.coastlines()
 
-    t = 4
+    t = 0
     ax.quiver(rad2deg(m[t,:,1]),
               rad2deg(m[t,:,0], offset=jnp.pi/2),
               mean[t,:,1],
               mean[t,:,0],
-              alpha=0.5,
-              color='chocolate',
+              alpha=0.8,
+              color='purple',
               scale=scale,
               width=width,
               headwidth=headwidth,
@@ -71,13 +72,13 @@ def plot(
     spatial_size = lon_size*lat_size
     var_norm = jnp.diag(jnp.trace(K[t*spatial_size:(t+1)*spatial_size, t*spatial_size:(t+1)*spatial_size], axis1=2, axis2=3)).reshape(lon_size, lat_size)
     std_norm = jnp.sqrt(var_norm).transpose()
-    CS = plt.contourf(*mesh, std_norm, levels=np.linspace(0.5, 4.5, 30), zorder=1, transform=crs)
+    CS = plt.contourf(*mesh, std_norm, levels=np.linspace(0.5, 4.5, 20), zorder=1, transform=crs)
 
     n_points = 200
     x = 1.*np.ones(n_points)
     y = np.linspace(-89, 89, n_points)
     plt.plot(x, y,
-            color='deeppink', linewidth=3, #linestyle='--',
+            color='deeppink', linewidth=2, #linestyle='--',
             zorder=2,
             transform=crs,
             )
@@ -87,7 +88,7 @@ def plot(
         cbar.ax.tick_params(labelsize=14)
         x = 359.*np.ones(n_points)
         plt.plot(x, y,
-                color='deeppink', linewidth=3, #linestyle='--',
+                color='deeppink', linewidth=2, #linestyle='--',
                 zorder=2,
                 transform=crs,
                 )
@@ -153,7 +154,7 @@ def animate(
         std_norm = jnp.sqrt(var_norm).transpose()
         plt.contourf(*mesh, std_norm, levels=np.linspace(0.5, 4.5, 30), zorder=1, transform=crs)
 
-        ax.text(0.45, 1.03, f'time = {t+1}', transform=ax.transAxes, fontsize=16)
+        ax.text(0.45, 1.03, f'Time = {t+1}', transform=ax.transAxes, fontsize=20)
 
         camera.snap()
 
