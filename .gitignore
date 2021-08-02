@@ -133,3 +133,5 @@ dmypy.json
 .vscode
 
 datasets
+blender
+*.blend*

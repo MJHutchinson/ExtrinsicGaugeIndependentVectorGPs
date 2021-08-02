@@ -33,6 +33,34 @@ def mesh_to_polyscope(mesh, wrap_x=True, wrap_y=True):
     return mesh_, faces_
 
 
+def mesh_to_polyscope_triangular(mesh, wrap_x=True, wrap_y=True):
+    n, m, _ = mesh.shape
+
+    n_faces = n if wrap_x else n - 1
+    m_faces = m if wrap_y else m - 1
+
+    ii, jj = np.meshgrid(np.arange(n), np.arange(m))
+    ii = ii.T
+    jj = jj.T
+    coords = jj + m * ii
+
+    faces = np.zeros((n_faces, m_faces * 2, 3), int)
+    for i in range(n_faces):
+        for j in range(m_faces):
+            faces[i, 2 * j, 0] = coords[i, j]
+            faces[i, 2 * j, 1] = coords[(i + 1) % n, j]
+            faces[i, 2 * j, 2] = coords[i, (j + 1) % m]
+
+            faces[i, (2 * j) + 1, 0] = coords[(i + 1) % n, j]
+            faces[i, (2 * j) + 1, 1] = coords[(i + 1) % n, (j + 1) % m]
+            faces[i, (2 * j) + 1, 2] = coords[i, (j + 1) % m]
+
+    mesh_ = mesh.reshape(-1, 3)
+    faces_ = faces.reshape(-1, 3)
+
+    return mesh_, faces_
+
+
 def project_to_3d(M, V, m_to_3d, projection_matrix_to_3d):
     X = m_to_3d(M)
     Y = (
