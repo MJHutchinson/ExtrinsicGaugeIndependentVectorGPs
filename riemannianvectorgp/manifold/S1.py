@@ -14,7 +14,7 @@ class S1(AbstractRiemannianMainfold):
 
     def __init__(
         self,
-        radius: float,
+        radius: float = 0.5,
     ):
         self.radius = radius
 

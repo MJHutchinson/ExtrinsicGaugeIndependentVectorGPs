@@ -4,7 +4,7 @@ from jax import grad
 import jax.numpy as jnp
 
 
-def mesh_to_polyscope(mesh, wrap_x=True, wrap_y=True):
+def mesh_to_polyscope(mesh, wrap_x=True, wrap_y=True, reverse_x=False, reverse_y=False):
     n, m, _ = mesh.shape
 
     n_faces = n if wrap_x else n - 1
@@ -18,14 +18,30 @@ def mesh_to_polyscope(mesh, wrap_x=True, wrap_y=True):
     faces = np.zeros((n_faces, m_faces, 4), int)
     for i in range(n_faces):
         for j in range(m_faces):
-            faces[i, j, 0] = coords[i, j]
-            faces[i, j, 1] = coords[(i + 1) % n, j]
-            faces[i, j, 2] = coords[(i + 1) % n, (j + 1) % m]
-            faces[i, j, 3] = coords[i, (j + 1) % m]
-            # faces[i, j, 0] = j + (i * n)
-            # faces[i, j, 1] = ((j + 1) % m) + (i * n)
-            # faces[i, j, 2] = ((j + 1) % m) + ((i + 1) % n) * n
-            # faces[i, j, 3] = j + ((i + 1) % n) * n
+
+            c1 = [i, j]
+            c2 = [(i + 1) % n, j]
+            c3 = [(i + 1) % n, (j + 1) % m]
+            c4 = [i, (j + 1) % m]
+
+            # print(i, n)
+            if (i == n - 1) and reverse_x:
+                c2[1] = (-c2[1] - 2) % m
+                c3[1] = (-c3[1] - 2) % m
+                # c2[1] = (-c2[1] - int(m / 2) - 2) % m
+                # c3[1] = (-c3[1] - int(m / 2) - 2) % m
+            if (j == m - 1) and reverse_y:
+                c3[0] = (-c3[0] - 2) % n
+                c4[0] = (-c4[0] - 2) % n
+                # c3[0] = (-c3[0] - int(n / 2) - 2) % n
+                # c4[0] = (-c4[0] - int(n / 2) - 2) % n
+
+            faces[i, j, 0] = coords[c1[0], c1[1]]
+            faces[i, j, 1] = coords[c2[0], c2[1]]
+            faces[i, j, 2] = coords[c3[0], c3[1]]
+            faces[i, j, 3] = coords[c4[0], c4[1]]
+
+            # if i == (n - 1)
 
     mesh_ = mesh.reshape(-1, 3)
     faces_ = faces.reshape(-1, 4)
@@ -142,3 +158,74 @@ def t2_projection_matrix_to_3d(M, R=3, r=1):
         [jax.vmap(grad(lambda m: t2_m_to_3d(m)[..., i]))(M) for i in range(3)], axis=-1
     )
     return grad_proj / jnp.linalg.norm(grad_proj, axis=-1)[..., np.newaxis]
+
+
+def klein_bottle_m_to_3d(M):
+    u, v = M[..., 0], M[..., 1]
+
+    cu = jnp.cos(u)
+    su = jnp.sin(u)
+    cv = jnp.cos(v)
+    sv = jnp.sin(v)
+
+    return jnp.stack(
+        [
+            -(2 / 15)
+            * cu
+            * (
+                3 * cv
+                - 30 * su
+                + 90 * jnp.power(cu, 4) * su
+                - 60 * jnp.power(cu, 6) * su
+                + 5 * cu * cv * su
+            ),
+            -(1 / 15)
+            * su
+            * (
+                3 * cv
+                - 3 * jnp.power(cu, 2) * cv
+                - 48 * jnp.power(cu, 4) * cv
+                + 48 * jnp.power(cu, 6) * cv
+                - 60 * su
+                + 5 * cu * cv * su
+                + 80 * jnp.power(cu, 7) * cv * su
+            ),
+            (2 / 15) * (3 + 5 * cu * su) * sv,
+        ],
+        axis=-1,
+    )
+
+
+def klein_fig8_m_to_3d(M, r=2):
+    u, v = M[..., 0], M[..., 1]
+    u = u * 4
+
+    cu = jnp.cos(u)
+    su = jnp.sin(u)
+    cu2 = jnp.cos(u / 2)
+    su2 = jnp.sin(u / 2)
+    sv = jnp.sin(v)
+    s2v = jnp.sin(2 * v)
+
+    return jnp.stack(
+        [
+            (r + cu2 * sv - su2 * s2v) * cu,
+            (r + cu2 * sv - su2 * s2v) * su,
+            su2 * sv + cu2 * s2v,
+        ],
+        axis=-1,
+    )
+
+
+def klein_fig8_double_m_to_3d(M, r=2, delta=0.2):
+
+    E = klein_fig8_m_to_3d(M, r=r)
+
+    tangents = jnp.stack(
+        [jax.vmap(grad(lambda m: klein_fig8_m_to_3d(m)[..., i]))(M) for i in range(3)],
+        axis=-1,
+    )
+    normals = jax.vmap(lambda t: jnp.cross(t[0], t[1]))(tangents)
+    normals = normals / jnp.linalg.norm(normals, axis=1, keepdims=True)
+
+    return E + normals * delta

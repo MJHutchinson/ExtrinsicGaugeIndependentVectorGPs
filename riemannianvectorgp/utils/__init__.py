@@ -4,3 +4,4 @@ from .polyscope import *
 from .gp import *
 from .plotting import *
 from .distances import *
+from .blender import *
