@@ -4,7 +4,11 @@ import numpy as np
 from jax import jit
 import jax.numpy as jnp
 
-from riemannianvectorgp.utils import _spherical_harmonics
+from riemannianvectorgp.utils.spherical_harmonics import (
+    _spherical_harmonics,
+    _d_n,
+    _c_nd,
+)
 from .manifold import AbstractRiemannianMainfold
 from .embedded_manifold import AbstractEmbeddedRiemannianManifold
 
@@ -15,11 +19,20 @@ class S2(AbstractRiemannianMainfold):
 
     def __init__(
         self,
-        radius: float,
+        radius: float = 1.0,
         max_l: int = 11,
     ):
         self.radius = radius
         self.max_l = max_l
+        self.constants = np.zeros(
+            sum([_d_n(n, self.dimension) for n in range(max_l + 1)])
+        )
+        i = 0
+        for n in range(max_l + 1):
+            d_n = _d_n(n, self.dimension)
+            self.constants[i : (i + d_n)] = jnp.sqrt(_c_nd(n, self.dimension))
+            i += d_n
+        self.constants = jnp.array(self.constants)
 
     @partial(jit, static_argnums=(0,))
     def laplacian_eigenvalue(
@@ -45,7 +58,10 @@ class S2(AbstractRiemannianMainfold):
 
         e = jnp.stack([x, y, z], axis=-1)
 
-        return _spherical_harmonics(self.max_l, e)[..., n, np.newaxis]
+        return (
+            self.constants[n, np.newaxis]
+            * _spherical_harmonics(self.max_l, e)[..., n, np.newaxis]
+        )
 
     def __repr__(
         self,
@@ -59,12 +75,8 @@ class S2(AbstractRiemannianMainfold):
 class EmbeddedS2(AbstractEmbeddedRiemannianManifold, S2):
     embedded_dimension = 3
 
-    def __init__(
-        self,
-        radius: float,
-        max_l: int = 11,
-    ):
-        super().__init__(radius, max_l)
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
 
     @partial(jit, static_argnums=(0,))
     def m_to_e(self, M):
@@ -87,25 +99,25 @@ class EmbeddedS2(AbstractEmbeddedRiemannianManifold, S2):
         z = E[..., 2]
         return jnp.stack([jnp.arccos(z), jnp.arctan2(y, x)], axis=-1)
 
-    @partial(jit, static_argnums=(0,))
-    def projection_matrix(self, M):
-        phi = M[..., 0]
-        theta = M[..., 1]
+    # @partial(jit, static_argnums=(0,))
+    # def projection_matrix(self, M):
+    #     phi = M[..., 0]
+    #     theta = M[..., 1]
 
-        e1 = jnp.stack(
-            [
-                jnp.cos(phi) * jnp.cos(theta),
-                jnp.cos(phi) * jnp.sin(theta),
-                -jnp.sin(phi),
-            ],
-            axis=-1,
-        )
-        e2 = -jnp.stack([-jnp.sin(theta), jnp.cos(theta), jnp.zeros_like(phi)], axis=-1)
+    #     e1 = jnp.stack(
+    #         [
+    #             jnp.cos(phi) * jnp.cos(theta),
+    #             jnp.cos(phi) * jnp.sin(theta),
+    #             -jnp.sin(phi),
+    #         ],
+    #         axis=-1,
+    #     )
+    #     e2 = -jnp.stack([-jnp.sin(theta), jnp.cos(theta), jnp.zeros_like(phi)], axis=-1)
 
-        return jnp.stack(
-            [
-                e1,
-                e2,
-            ],
-            axis=-1,
-        )
+    #     return jnp.stack(
+    #         [
+    #             e1,
+    #             e2,
+    #         ],
+    #         axis=-1,
+    #     )

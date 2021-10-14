@@ -305,3 +305,11 @@ make_scalar_texture(
     "scalar.png",
 )
 # %%
+rng = GlobalRNG(0)
+
+kernel = MaternCompactRiemannianManifoldKernel(1.5, S2, 144)
+kernel_params = kernel.init_params(next(rng))
+k = kernel.matrix(kernel_params, m, m)
+sphere_mesh.add_scalar_quantity("kernel", k[0, :, 0, 0])
+
+# %%
