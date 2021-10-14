@@ -1,5 +1,6 @@
 # %%
-
+%load_ext autoreload
+%autoreload 2
 import jax
 import jax.numpy as jnp
 from riemannianvectorgp.manifold import S1
@@ -9,9 +10,11 @@ from riemannianvectorgp.utils import (
     klein_bottle_m_to_3d,
     klein_fig8_m_to_3d,
     klein_fig8_double_m_to_3d,
+    GlobalRNG
 )
 from riemannianvectorgp.utils import GlobalRNG, mesh_to_polyscope
 
+rng = GlobalRNG((0))
 
 # %%
 import polyscope as ps
@@ -21,8 +24,10 @@ ps.set_up_dir("z_up")
 
 # %%
 num_points = 30
-u = np.linspace(0, np.pi, num_points + 1)[1:]
-v = np.linspace(0, 2 * np.pi, num_points + 1)[1:]
+u = np.linspace(0, 2*np.pi, 2*num_points - 1)
+shift = 15
+u = u[shift:shift+num_points]
+v = np.linspace(0, 2 * np.pi, num_points + 1) [1:]
 u, v = np.meshgrid(u, v, indexing="ij")
 u = u.flatten()
 v = v.flatten()
@@ -43,7 +48,7 @@ def _2d_to_3d(m):
 klein_mesh = ps.register_surface_mesh(
     f"klein_8_double_surface",
     *mesh_to_polyscope(
-        klein_fig8_double_m_to_3d(m, delta=0.1).reshape((num_points, num_points, 3)),
+        klein_fig8_double_m_to_3d(m).reshape((num_points, num_points, 3)),
         wrap_x=True,
         wrap_y=True,
         reverse_x=False,
@@ -57,12 +62,13 @@ klein_mesh = ps.register_surface_mesh(
     # color=(231/255, 41/255, 139/255), # colorbrewer magenta
     smooth_shade=True,
     material="wax",
+    enabled=False,
 )
 klein_mesh = ps.register_surface_mesh(
     f"klein_8_surface",
     *mesh_to_polyscope(
-        klein_fig8_m_to_3d(m).reshape((num_points, num_points, 3)),
-        wrap_x=True,
+        klein_bottle_m_to_3d(m).reshape((num_points, num_points, 3)),
+        wrap_x=False,
         wrap_y=True,
         reverse_x=False,
     ),
@@ -76,60 +82,56 @@ klein_mesh = ps.register_surface_mesh(
     smooth_shade=True,
     material="wax",
 )
-klein_rect = ps.register_surface_mesh(
-    "plane_klein",
-    *mesh_to_polyscope(
-        _2d_to_3d(m).reshape((num_points, num_points, 3)), wrap_x=False, wrap_y=False
-    ),
-)
-torus_square = ps.register_surface_mesh(
-    "plane_torus",
-    *mesh_to_polyscope(
-        _2d_to_3d(m2).reshape((num_points, num_points, 3)), wrap_x=False, wrap_y=False
-    ),
-)
-# %%
-def identifiction(M):
-    x, y = M[..., 0], M[..., 1]
-    return jnp.stack([x + jnp.pi, 2 * jnp.pi - y], axis=-1)
 
-
-n = 20
-test_points = jnp.stack([jnp.zeros(n), jnp.linspace(0, 2 * jnp.pi, n)], axis=-1)
-identifiction_points = ps.register_point_cloud(
-    "points",
-    _2d_to_3d(jnp.concatenate([test_points, identifiction(test_points)], axis=0)),
+tangent_vec = jnp.stack(
+    [
+        jax.vmap(jax.grad(lambda m: klein_bottle_m_to_3d(m)[..., i]))(m)
+        for i in range(3)
+    ],
+    axis=-2,
 )
-identifiction_points.add_scalar_quantity(
-    "index", jnp.concatenate([jnp.arange(n), jnp.arange(n)])
-)
+tangent_vec = tangent_vec / jnp.linalg.norm(tangent_vec, axis=-2)[..., np.newaxis, :]
+klein_mesh.set_vertex_tangent_basisX(tangent_vec[..., 0])
 # %%
 
-T2 = S1(0.5) * S1(0.5)
+from riemannianvectorgp.manifold import EmbeddedKleinBottle
+
+KB = EmbeddedKleinBottle()
+kb_eigs = KB.laplacian_eigenfunction(jnp.arange(100), m)
+
+for i in range(100):
+    klein_mesh.add_scalar_quantity(f'eigfunc {i}', kb_eigs[:, i, 0])
+# %%
+from riemannianvectorgp.kernel import MaternCompactRiemannianManifoldKernel
+
+kernel = MaternCompactRiemannianManifoldKernel(1.5, KB, 100)
+kernel_parmas = kernel.init_params(next(rng))
+kernel_parmas = kernel_parmas._replace(log_length_scale=jnp.array(-2))
+k = kernel.matrix(kernel_parmas, m, m)
+klein_mesh.add_scalar_quantity(f'kernel', k[450 + 10 - 5*30, :, 0, 0])
 
 # %%
-eig_funcs = T2.laplacian_eigenfunction(jnp.arange(20), m2)
-for i in range(eig_funcs.shape[1]):
-    torus_square.add_scalar_quantity(f"eigen_{i}", eig_funcs[:, i, 0])
+from riemannianvectorgp.kernel import ManifoldProjectionVectorKernel
+
+kernel = ManifoldProjectionVectorKernel(MaternCompactRiemannianManifoldKernel(1.5, KB, 100), KB)
+kernel_parmas = kernel.init_params(next(rng))
+k = kernel.matrix(kernel_parmas, m, m)
+klein_mesh.add_intrinsic_vector_quantity('vec_kernel', k[450 + 10 - 5*30, :, :, :] @ jnp.array([1, 0]))
 # %%
-n_eigs = 200
-eig_inds = jnp.arange(n_eigs)
-diff = T2.laplacian_eigenfunction(eig_inds, m2) - T2.laplacian_eigenfunction(
-    eig_inds, identifiction(m2)
+from riemannianvectorgp.sparse_gp import SparseGaussianProcess
+
+s = 5
+kernel = ManifoldProjectionVectorKernel(MaternCompactRiemannianManifoldKernel(1.5, KB, 100), KB)
+gp = SparseGaussianProcess(kernel, 1, 100, s)
+(params, state) = gp.init_params_with_state(next(rng))
+params = params._replace(
+    kernel_params=params.kernel_params._replace(log_length_scale=jnp.log(0.1))
 )
-test = jnp.mean(jnp.abs(diff), axis=(0, 2))
-inds = test < 1e-5
-cover_eigs = eig_inds[inds]
-non_cover_eigs = eig_inds[~inds]
+state = gp.randomize(params, state, next(rng))
 
-j_plus = eig_funcs = T2.laplacian_eigenfunction(cover_eigs, m2)
-j_minus = eig_funcs = T2.laplacian_eigenfunction(non_cover_eigs, m2)
+samples = gp.prior(params.kernel_params, state.prior_state, m)
 
-
-for i in range(j_plus.shape[0]):
-    torus_square.add_scalar_quantity(f"j+{i}", j_plus[:, i, 0])
-
-for i in range(j_minus.shape[0]):
-    torus_square.add_scalar_quantity(f"j-{i}", j_minus[:, i, 0])
+for i in range(s):
+    klein_mesh.add_intrinsic_vector_quantity(f'sample {i}', samples[i])
 
 # %%

@@ -131,7 +131,33 @@ class ProductManifold(AbstractRiemannianMainfold):
     def __repr__(
         self,
     ):
-        return "×".join([str(m) for m in self.sub_manifolds])
+        superscript_map = {
+            1: "",
+            2: "\U000000B2",
+            3: "\U000000B3",
+            4: "\U00002074",
+            5: "\U00002705",
+            6: "\U00002706",
+        }
+
+        reprs = []
+        counts = []
+        for m in self.sub_manifolds:
+            m = str(m)
+            if len(reprs) == 0:
+                reprs.append(m)
+                counts.append(1)
+            elif reprs[-1] == m:
+                counts[-1] = counts[-1] + 1
+            else:
+                reprs.append(m)
+                counts.append(1)
+
+        contracted_reprs = []
+        for r, c in zip(reprs, counts):
+            contracted_reprs.append(r + superscript_map[c])
+
+        return "×".join(contracted_reprs)
 
     def __mul__(self, other):
         if isinstance(other, AbstractRiemannianMainfold):

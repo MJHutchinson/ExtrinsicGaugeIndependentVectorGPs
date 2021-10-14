@@ -188,6 +188,8 @@ def klein_bottle_m_to_3d(M):
                 + 48 * jnp.power(cu, 6) * cv
                 - 60 * su
                 + 5 * cu * cv * su
+                - 5 * jnp.power(cu, 3) * cv * su
+                - 80 * jnp.power(cu, 5) * cv * su
                 + 80 * jnp.power(cu, 7) * cv * su
             ),
             (2 / 15) * (3 + 5 * cu * su) * sv,
@@ -198,7 +200,7 @@ def klein_bottle_m_to_3d(M):
 
 def klein_fig8_m_to_3d(M, r=2):
     u, v = M[..., 0], M[..., 1]
-    u = u * 4
+    u = u * 2
 
     cu = jnp.cos(u)
     su = jnp.sin(u)

@@ -34,11 +34,6 @@ class S1(AbstractRiemannianMainfold):
     ) -> jnp.ndarray:
         freq = n // 2
         phase = -(jnp.pi / 2) * (n % 2)
-        # neg = -((((n // 2) + 1) % 2) * 2 - 1)
-        # phase = phase * neg
-        # print(f"{x.shape=}")
-        # print(f"{freq.shape=}")
-        # print(f"{phase.shape=}")
         return jnp.sqrt(2) * jnp.expand_dims(jnp.cos(x * freq + phase), -1)
 
     def __repr__(
@@ -69,6 +64,6 @@ class EmbeddedS1(AbstractEmbeddedRiemannianManifold, S1):
             jnp.arctan2(E[..., 0] / self.radius, E[..., 1] / self.radius) % (2 * jnp.pi)
         )[..., np.newaxis]
 
-    @partial(jit, static_argnums=(0,))
-    def projection_matrix(self, M):
-        return jnp.stack([jnp.cos(M), -jnp.sin(M)], axis=-2)
+    # @partial(jit, static_argnums=(0,))
+    # def projection_matrix(self, M):
+    #     return jnp.stack([jnp.cos(M), -jnp.sin(M)], axis=-2)

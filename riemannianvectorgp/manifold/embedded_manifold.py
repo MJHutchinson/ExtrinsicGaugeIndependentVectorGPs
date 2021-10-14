@@ -38,10 +38,11 @@ class AbstractEmbeddedRiemannianManifold(AbstractRiemannianMainfold):
         """
         pass
 
-    @abstractmethod
+    @partial(jit, static_argnums=(0,))
     def projection_matrix(self, M):
         """Matrix function that projects intrinsic tangent vectors into
-        the ambient Euclidean space.
+        the ambient Euclidean space. Auto computed as the Jacobian of the
+        embedding into Euclidean space.
 
         Implicitly encodes a choice of gauge.
 
@@ -49,7 +50,15 @@ class AbstractEmbeddedRiemannianManifold(AbstractRiemannianMainfold):
         ----------
         M : jnp.array
         """
-        pass
+        grad_proj = jnp.stack(
+            [
+                jax.vmap(jax.grad(lambda m: self.m_to_e(m)[..., i]))(M)
+                for i in range(self.embedded_dimension)
+            ],
+            axis=-2,
+        )
+
+        return grad_proj / jnp.linalg.norm(grad_proj, axis=-2)[..., np.newaxis, :]
 
     def mesh(self, n_points):
         """Generates an intrinsic coordinate mesh of the manifold with some
