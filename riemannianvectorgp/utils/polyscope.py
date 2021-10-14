@@ -231,3 +231,47 @@ def klein_fig8_double_m_to_3d(M, r=2, delta=0.2):
     normals = normals / jnp.linalg.norm(normals, axis=1, keepdims=True)
 
     return E + normals * delta
+
+
+def sphere_m_to_3d(M):
+    phi = M[..., 0]
+    theta = M[..., 1]
+
+    return jnp.stack(
+        [
+            jnp.sin(phi) * jnp.cos(theta),
+            jnp.sin(phi) * jnp.sin(theta),
+            jnp.cos(phi),
+        ],
+        axis=-1,
+    )
+
+
+def sphere_flat_m_to_3d(M):
+    phi = M[..., 0]
+    theta = M[..., 1]
+
+    return jnp.stack(
+        [
+            jnp.zeros_like(theta),
+            -(theta - jnp.pi),
+            -(phi - (jnp.pi / 2)),
+        ],
+        axis=-1,
+    )
+
+
+def interp(M, embedding_1, embedding_2, t):
+    return (1 - t) * embedding_1(M) + t * embedding_2(M)
+
+
+def projection_matrix(M, embedding, embedding_dim=3):
+    grad_proj = jnp.stack(
+        [
+            jax.vmap(jax.grad(lambda m: embedding(m)[..., i]))(M)
+            for i in range(embedding_dim)
+        ],
+        axis=-2,
+    )
+
+    return grad_proj / jnp.linalg.norm(grad_proj, axis=-2)[..., np.newaxis, :]

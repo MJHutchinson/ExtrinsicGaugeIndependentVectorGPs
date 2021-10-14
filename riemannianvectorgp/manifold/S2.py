@@ -99,25 +99,25 @@ class EmbeddedS2(AbstractEmbeddedRiemannianManifold, S2):
         z = E[..., 2]
         return jnp.stack([jnp.arccos(z), jnp.arctan2(y, x)], axis=-1)
 
-    # @partial(jit, static_argnums=(0,))
-    # def projection_matrix(self, M):
-    #     phi = M[..., 0]
-    #     theta = M[..., 1]
+    @partial(jit, static_argnums=(0,))
+    def projection_matrix(self, M):
+        phi = M[..., 0]
+        theta = M[..., 1]
 
-    #     e1 = jnp.stack(
-    #         [
-    #             jnp.cos(phi) * jnp.cos(theta),
-    #             jnp.cos(phi) * jnp.sin(theta),
-    #             -jnp.sin(phi),
-    #         ],
-    #         axis=-1,
-    #     )
-    #     e2 = -jnp.stack([-jnp.sin(theta), jnp.cos(theta), jnp.zeros_like(phi)], axis=-1)
+        e1 = jnp.stack(
+            [
+                jnp.cos(phi) * jnp.cos(theta),
+                jnp.cos(phi) * jnp.sin(theta),
+                -jnp.sin(phi),
+            ],
+            axis=-1,
+        )
+        e2 = -jnp.stack([-jnp.sin(theta), jnp.cos(theta), jnp.zeros_like(phi)], axis=-1)
 
-    #     return jnp.stack(
-    #         [
-    #             e1,
-    #             e2,
-    #         ],
-    #         axis=-1,
-    #     )
+        return jnp.stack(
+            [
+                e1,
+                e2,
+            ],
+            axis=-1,
+        )
