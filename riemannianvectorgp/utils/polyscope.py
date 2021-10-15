@@ -275,3 +275,24 @@ def projection_matrix(M, embedding, embedding_dim=3):
     )
 
     return grad_proj / jnp.linalg.norm(grad_proj, axis=-2)[..., np.newaxis, :]
+
+
+def import_obj(file):
+    vertices = []
+    faces = []
+    with open(file, "r") as file:
+        for line in file:
+            if line.startswith("v "):
+                coords = line.split(" ")[1:]
+                coords = jnp.array([float(c) for c in coords])
+                vertices.append(coords)
+            elif line.startswith("f "):
+                coords = line.split(" ")[1:]
+                coords = jnp.array([int(c.split("/")[0]) for c in coords])
+                if len(coords) > 4:
+                    continue
+                faces.append(coords)
+            # elif line.startswith("o "):
+            #     offset = vertices_seen
+
+    return jnp.stack(vertices, axis=0), jnp.stack(faces, axis=0) - 1
