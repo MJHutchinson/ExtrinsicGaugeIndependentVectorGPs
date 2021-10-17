@@ -1,6 +1,7 @@
 from functools import partial
 
 import numpy as np
+import jax
 from jax import jit
 import jax.numpy as jnp
 
@@ -9,6 +10,7 @@ from riemannianvectorgp.utils.spherical_harmonics import (
     _d_n,
     _c_nd,
 )
+from riemannianvectorgp.utils import projection_matrix
 from .manifold import AbstractRiemannianMainfold
 from .embedded_manifold import AbstractEmbeddedRiemannianManifold
 
@@ -101,23 +103,24 @@ class EmbeddedS2(AbstractEmbeddedRiemannianManifold, S2):
 
     @partial(jit, static_argnums=(0,))
     def projection_matrix(self, M):
-        phi = M[..., 0]
-        theta = M[..., 1]
+        # phi = M[..., 0]
+        # theta = M[..., 1]
 
-        e1 = jnp.stack(
-            [
-                jnp.cos(phi) * jnp.cos(theta),
-                jnp.cos(phi) * jnp.sin(theta),
-                -jnp.sin(phi),
-            ],
-            axis=-1,
-        )
-        e2 = -jnp.stack([-jnp.sin(theta), jnp.cos(theta), jnp.zeros_like(phi)], axis=-1)
+        # e1 = jnp.stack(
+        #     [
+        #         jnp.cos(phi) * jnp.cos(theta),
+        #         jnp.cos(phi) * jnp.sin(theta),
+        #         -jnp.sin(phi),
+        #     ],
+        #     axis=-1,
+        # )
+        # e2 = -jnp.stack([-jnp.sin(theta), jnp.cos(theta), jnp.zeros_like(phi)], axis=-1)
 
-        return jnp.stack(
-            [
-                e1,
-                e2,
-            ],
-            axis=-1,
-        )
+        # return jnp.stack(
+        #     [
+        #         e1,
+        #         e2,
+        #     ],
+        #     axis=-1,
+        # )
+        return projection_matrix(M, self.m_to_e)

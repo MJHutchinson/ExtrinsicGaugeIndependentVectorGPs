@@ -244,3 +244,7 @@ def save_obj(lines, file):
     with open(file, "w") as f:
         for line in lines:
             f.write(line + "\n")
+
+
+def export_vec_field(V, vecs, file):
+    np.savetxt(file, jnp.concatenate([V, vecs], axis=1), delimiter=",")

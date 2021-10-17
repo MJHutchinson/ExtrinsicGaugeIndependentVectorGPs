@@ -4,6 +4,8 @@
 import os
 
 os.chdir("..")
+
+# %%
 import numpy as np
 import jax.numpy as jnp
 from riemannianvectorgp.utils import GlobalRNG, mesh_to_polyscope
@@ -19,9 +21,15 @@ from riemannianvectorgp.utils import (
     regular_square_mesh_to_obj,
     make_scalar_texture,
     square_mesh_to_obj,
-    GlobalRNG
+    export_vec_field,
+    GlobalRNG,
 )
-from riemannianvectorgp.utils import sphere_flat_m_to_3d, sphere_m_to_3d, interp, projection_matrix
+from riemannianvectorgp.utils import (
+    sphere_flat_m_to_3d,
+    sphere_m_to_3d,
+    interp,
+    projection_matrix,
+)
 import potpourri3d as pp3d
 
 import polyscope as ps
@@ -43,14 +51,12 @@ colormap3 = "Oranges"
 S2 = EmbeddedS2(1.0)
 num_points = 30
 e = 1e-3
-phi = np.linspace(0+e, np.pi-e, num_points)
+phi = np.linspace(0 + e, np.pi - e, num_points)
 theta = np.linspace(0, 2 * np.pi, num_points)
 phi, theta = np.meshgrid(phi, theta, indexing="ij")
 phi = phi.flatten()
 theta = theta.flatten()
-m = np.stack(
-    [phi, theta], axis=-1
-) 
+m = np.stack([phi, theta], axis=-1)
 # %%
 # sphere_mesh = ps.register_surface_mesh(
 #     "Sphere",
@@ -66,11 +72,16 @@ m = np.stack(
 #     smooth_shade=True,
 #     material="wax",
 # )
-from riemannianvectorgp.kernel import MaternCompactRiemannianManifoldKernel, ManifoldProjectionVectorKernel
+from riemannianvectorgp.kernel import (
+    MaternCompactRiemannianManifoldKernel,
+    ManifoldProjectionVectorKernel,
+)
 from riemannianvectorgp.sparse_gp import SparseGaussianProcess
 
 s = 1
-kernel = ManifoldProjectionVectorKernel(MaternCompactRiemannianManifoldKernel(1.5, EmbeddedS2(), 100), EmbeddedS2())
+kernel = ManifoldProjectionVectorKernel(
+    MaternCompactRiemannianManifoldKernel(1.5, EmbeddedS2(), 100), EmbeddedS2()
+)
 gp = SparseGaussianProcess(kernel, 1, 100, s)
 (params, state) = gp.init_params_with_state(next(rng))
 params = params._replace(
@@ -79,30 +90,36 @@ params = params._replace(
 state = gp.randomize(params, state, next(rng))
 sample = gp.prior(params.kernel_params, state.prior_state, m)[0]
 
+track_points = np.genfromtxt(f"blender/satellite_tracks/track_angles.csv", delimiter=',')
+track_vecs = np.genfromtxt(f"blender/satellite_tracks/track_intrinsic_vecs.csv", delimiter=',')
+
 # %%
-frames = 5
+frames = 60
+frame_meshes = []
+frame_vecs = []
 for i in range(frames):
     embedding_func = lambda m: interp(
-                m,
-                sphere_m_to_3d,
-                sphere_flat_m_to_3d,
-                t = i / (frames - 1)
-            )
+        m, sphere_m_to_3d, sphere_flat_m_to_3d, t=i / (frames - 1)
+    )
     proj_mat_func = lambda m: projection_matrix(m, embedding_func)
 
-    sphere_mesh = ps.register_surface_mesh(
-        f"Frame {i}",
+    V, F = (
         *mesh_to_polyscope(
-            embedding_func(m).reshape((num_points, num_points, 3))
-            , wrap_x=False, wrap_y=False
+            embedding_func(m).reshape((num_points, num_points, 3)),
+            wrap_x=False,
+            wrap_y=False,
         ),
-        color=(1, 1, 1),
-        smooth_shade=True,
-        material="wax",
-        transparency=0.5,
     )
 
-    sphere_mesh.set_vertex_tangent_basisX(proj_mat_func(m)[..., 0])
-    sphere_mesh.add_intrinsic_vector_quantity('sample', sample, color=(1,0,0), enabled=True)
-ps.show()
+    euclidean_vecs = (proj_mat_func(track_points) @ track_vecs[..., np.newaxis])[..., 0]
+
+    frame_meshes.append((V, F))
+    frame_vecs.append((embedding_func(track_points), euclidean_vecs))
+
+# %%
+for i, ((V, F), (TP, TV)) in enumerate(zip(frame_meshes, frame_vecs)):
+    print(i)
+    # save_obj(mesh_to_obj(V, F, uv_coords=m / jnp.array([jnp.pi, 2 * jnp.pi])), f"blender/unwrap_sphere/frame_{i}.obj")
+    export_vec_field(TP, TV, f"blender/unwrap_sphere/frame_{i}.csv")
+
 # %%
