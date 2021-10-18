@@ -46,13 +46,15 @@ setup_lighting(
 )
 bd_obj = create_backdrop(location=(0, 0, -2), scale=(10, 5, 5))
 arr_obj = create_vector_arrow(color=(1, 0, 0, 1))
-set_object_collections(backdrop=[bd_obj], instancing=[arr_obj])
 
 bm = import_bmesh(os.path.join(data_dir, "unwrap_sphere", "frame_0.obj"))
 earth_obj = add_mesh(bm, name="Earth")
 bpy.ops.object.select_all(action="DESELECT")
 bpy.data.objects["Earth"].select_set(True)
+ov=bpy.context.copy()
+ov['area']=[a for a in bpy.context.screen.areas if a.type=="VIEW_3D"][0]
 bpy.ops.transform.rotate(
+    ov,
     value=1.5708,
     orient_axis="Z",
     orient_type="GLOBAL",
@@ -67,13 +69,6 @@ bpy.ops.transform.rotate(
     use_proportional_projected=False,
 )
 
-# earth_mat = bpy.data.materials.new(name="Earth")
-# earth_mat.use_nodes = True
-# add_texture(earth_mat, "mercator_rot.png")
-# bsdf = earth_mat.node_tree.nodes["Principled BSDF"]
-# texImage = earth_mat.node_tree.nodes.new("ShaderNodeTexImage")
-# texImage.image = bpy.data.images.load(os.path.join(texture_path))
-# earth_mat.node_tree.links.new(bsdf.inputs["Base Color"], texImage.outputs["Color"])
 earth_mat = add_base_color(earth_obj)
 add_texture(earth_mat, os.path.join(texture_path, "mercator_rot.png"))
 
@@ -114,34 +109,6 @@ bpy.ops.object.empty_add(
 )
 satellite_empty = bpy.context.selected_objects[0]
 satellite_obj.parent = satellite_empty
-# bpy.ops.transform.rotate(
-#     value=1.5708,
-#     orient_axis="Z",
-#     orient_type="GLOBAL",
-#     orient_matrix=((1, 0, 0), (0, 1, 0), (0, 0, 1)),
-#     orient_matrix_type="GLOBAL",
-#     constraint_axis=(False, False, True),
-#     mirror=True,
-#     use_proportional_edit=False,
-#     proportional_edit_falloff="SMOOTH",
-#     proportional_size=1,
-#     use_proportional_connected=False,
-#     use_proportional_projected=False,
-# )
-# bpy.ops.transform.rotate(
-#     value=1.5708,
-#     orient_axis="Y",
-#     orient_type="GLOBAL",
-#     orient_matrix=((1, 0, 0), (0, 1, 0), (0, 0, 1)),
-#     orient_matrix_type="GLOBAL",
-#     constraint_axis=(False, True, False),
-#     mirror=True,
-#     use_proportional_edit=False,
-#     proportional_edit_falloff="SMOOTH",
-#     proportional_size=1,
-#     use_proportional_connected=False,
-#     use_proportional_projected=False,
-# )
 
 bpy.context.scene.cursor.location = Vector((0.0, 0.0, 0.0))
 bpy.context.scene.cursor.rotation_euler = Vector((0.0, 0.0, 0.0))
@@ -162,7 +129,10 @@ for i in range(len(track)):
     vf_obj = add_vector_field(vf_bm, arr_obj, scale=3, name=f"vec_{i}")
     bpy.ops.object.select_all(action="DESELECT")
     bpy.data.objects[f"vec_{i}"].select_set(True)
+    ov=bpy.context.copy()
+    ov['area']=[a for a in bpy.context.screen.areas if a.type=="VIEW_3D"][0]
     bpy.ops.transform.rotate(
+        ov,
         value=1.5708,
         orient_axis="Z",
         orient_type="GLOBAL",

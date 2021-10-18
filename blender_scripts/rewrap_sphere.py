@@ -49,7 +49,7 @@ grey_arr_obj = create_vector_arrow(color=(0.3,0.3,0.3, 1.0))
 # set_object_collections(backdrop=[bd_obj], instancing=[arr_obj])
 
 frames = 60
-for frame in range(frames):
+for frame in [0]:
     print(frame)
     frame_name = f"frame_{frames - frame - 1}"
     bm = import_bmesh(os.path.join(data_dir, "unwrap_sphere", f"{frame_name}.obj"))
@@ -59,7 +59,10 @@ for frame in range(frames):
     add_texture(earth_mat, os.path.join(texture_path, "mercator_rot.png"))
     bpy.ops.object.select_all(action="DESELECT")
     bpy.data.objects[frame_name].select_set(True)
+    ov=bpy.context.copy()
+    ov['area']=[a for a in bpy.context.screen.areas if a.type=="VIEW_3D"][0]
     bpy.ops.transform.rotate(
+        ov,
         value=1.5708,
         orient_axis="Z",
         orient_type="GLOBAL",
@@ -76,12 +79,15 @@ for frame in range(frames):
     vf_bm = import_vector_field(
         os.path.join(data_dir, "rewrap_sphere", f"{frame_name}.csv")
     )
-    vf_obj = add_vector_field(
+    mean_vf_obj = add_vector_field(
         vf_bm, grey_arr_obj, scale=3, name=frame_name + "_mean_field"
     )
     bpy.ops.object.select_all(action="DESELECT")
     bpy.data.objects[frame_name + "_mean_field"].select_set(True)
+    ov=bpy.context.copy()
+    ov['area']=[a for a in bpy.context.screen.areas if a.type=="VIEW_3D"][0]
     bpy.ops.transform.rotate(
+        ov,
         value=1.5708,
         orient_axis="Z",
         orient_type="GLOBAL",
@@ -98,12 +104,16 @@ for frame in range(frames):
     vf_bm = import_vector_field(
         os.path.join(data_dir, "unwrap_sphere", f"{frame_name}.csv")
     )
-    vf_obj = add_vector_field(
+    print(os.path.join(data_dir, "unwrap_sphere", f"{frame_name}.csv"))
+    track_vf_obj = add_vector_field(
         vf_bm, red_arr_obj, scale=3, name=frame_name + "_vector_field"
     )
     bpy.ops.object.select_all(action="DESELECT")
     bpy.data.objects[frame_name + "_vector_field"].select_set(True)
+    ov=bpy.context.copy()
+    ov['area']=[a for a in bpy.context.screen.areas if a.type=="VIEW_3D"][0]
     bpy.ops.transform.rotate(
+        ov,
         value=1.5708,
         orient_axis="Z",
         orient_type="GLOBAL",
@@ -118,11 +128,14 @@ for frame in range(frames):
         use_proportional_projected=False,
     )
     bpy.context.scene.render.filepath = os.path.join(
-        data_dir, "unwrap_sphere", "renders", f"frame_{frames - frame - 1}.png"
+        data_dir, "rewrap_sphere", "renders", f"frame_{frames - frame - 1}.png"
     )
     set_resolution(1080)
     bpy.ops.render.render(use_viewport=True, write_still=True)
-    for modifier in vf_obj.modifiers:
+    for modifier in mean_vf_obj.modifiers:
+        bpy.data.node_groups.remove(modifier.node_group, do_unlink=True)
+    for modifier in track_vf_obj.modifiers:
         bpy.data.node_groups.remove(modifier.node_group, do_unlink=True)
     bpy.data.objects.remove(obj, do_unlink=True)
-    # bpy.data.objects.remove(vf_obj, do_unlink=True)
+    bpy.data.objects.remove(mean_vf_obj, do_unlink=True)
+    bpy.data.objects.remove(track_vf_obj, do_unlink=True)

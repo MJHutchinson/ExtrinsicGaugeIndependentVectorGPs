@@ -58,12 +58,18 @@ theta = np.linspace(0, 2 * np.pi, num_points)
 phi, theta = np.meshgrid(phi, theta, indexing="ij")
 phi = phi.flatten()
 theta = theta.flatten()
-m = jnp.array(np.stack([phi, theta], axis=-1))
+m_sphere = jnp.array(np.stack([phi, theta], axis=-1))
+m = np.genfromtxt("/home/mhutchin/Documents/projects/ExtrinsicGaugeEquivariantVectorGPs/blender/kernels/poisson_sample.csv", delimiter = ',')
+m = S2.e_to_m(m)
+m = np.array(m)
+m[:, 1] = m[:, 1] % (2 * np.pi)
+m = jnp.array(m)
+
 
 sphere_mesh = ps.register_surface_mesh(
     "Flat sphere",
     *mesh_to_polyscope(
-        sphere_flat_m_to_3d(m).reshape((num_points, num_points, 3)),
+        sphere_flat_m_to_3d(m_sphere).reshape((num_points, num_points, 3)),
         wrap_x=False,
         wrap_y=False,
     ),
@@ -71,7 +77,8 @@ sphere_mesh = ps.register_surface_mesh(
     smooth_shade=True,
     material="wax",
 )
-sphere_mesh.set_vertex_tangent_basisX(projection_matrix(m, sphere_flat_m_to_3d)[..., 0])
+# sphere_mesh.set_vertex_tangent_basisX(projection_matrix(m, sphere_flat_m_to_3d)[..., 0])
+point_cloud = ps.register_point_cloud('poisson', sphere_flat_m_to_3d(m))
 # %%
 track_points = np.genfromtxt(
     f"blender/satellite_tracks/track_angles.csv", delimiter=","
@@ -109,10 +116,11 @@ params = params._replace(
 )
 
 state = gp.condition(params, track_points, track_vecs, jnp.ones_like(track_vecs) * 1e-6)
-mean_wrong, K = gp(params, state, m)
+mean_wrong, _ = gp(params, state, m)
+_, K = gp(params, state, m_sphere)
 s_wrong = jnp.linalg.det(K[jnp.arange(K.shape[0]), jnp.arange(K.shape[0])])
 
-sphere_mesh.add_intrinsic_vector_quantity('mean_wrong', mean_wrong)
+point_cloud.add_vector_quantity('mean_wrong', project(m, mean_wrong, sphere_flat_m_to_3d)[1])
 sphere_mesh.add_scalar_quantity('variance_wrong', s_wrong)
 
 # state = gp.randomize(params, state, next(rng))
@@ -129,10 +137,13 @@ params = params._replace(
 )
 # with jax.disable_jit():
 state = gp.condition(params, track_points, track_vecs, jnp.ones_like(track_vecs) * 1e-6)
-mean_right, K = gp(params, state, m)
+mean_right, _ = gp(params, state, m)
+_, K = gp(params, state, m_sphere)
 s_right = jnp.linalg.det(K[jnp.arange(K.shape[0]), jnp.arange(K.shape[0])])
 
-sphere_mesh.add_intrinsic_vector_quantity('mean_right', mean_right)
+# sphere_mesh.add_intrinsic_vector_quantity('mean_right', mean_right)
+# sphere_mesh.add_scalar_quantity('variance_right', s_right)
+point_cloud.add_vector_quantity('mean_right', project(m, mean_right, sphere_flat_m_to_3d)[1])
 sphere_mesh.add_scalar_quantity('variance_right', s_right)
 
 # %%
@@ -156,7 +167,7 @@ for i in range(frames):
 
     V, F = (
         *mesh_to_polyscope(
-            embedding_func(m).reshape((num_points, num_points, 3)),
+            embedding_func(m_sphere).reshape((num_points, num_points, 3)),
             wrap_x=False,
             wrap_y=False,
         ),
@@ -168,7 +179,7 @@ for i in range(frames):
     frame_vecs.append((embedding_func(m), euclidean_vecs))
 
 for i, ((V, F), (TP, TV)) in enumerate(zip(frame_meshes, frame_vecs)):
-    print(i)
+    # print(i)
     # save_obj(mesh_to_obj(V, F, uv_coords=m / jnp.array([jnp.pi, 2 * jnp.pi])), f"blender/unwrap_sphere/frame_{i}.obj")
     export_vec_field(TP, TV, f"blender/rewrap_sphere/frame_{i}.csv")
 

@@ -54,7 +54,10 @@ add_texture(earth_mat, os.path.join(texture_path, "mercator_rot.png"))
 
 bpy.ops.object.select_all(action="DESELECT")
 bpy.data.objects["Earth"].select_set(True)
+ov=bpy.context.copy()
+ov['area']=[a for a in bpy.context.screen.areas if a.type=="VIEW_3D"][0]
 bpy.ops.transform.rotate(
+    ov,
     value=1.5708,
     orient_axis="Z",
     orient_type="GLOBAL",
@@ -79,7 +82,10 @@ vf_obj = add_vector_field(
 )
 bpy.ops.object.select_all(action="DESELECT")
 bpy.data.objects["observations"].select_set(True)
+ov=bpy.context.copy()
+ov['area']=[a for a in bpy.context.screen.areas if a.type=="VIEW_3D"][0]
 bpy.ops.transform.rotate(
+    ov,
     value=1.5708,
     orient_axis="Z",
     orient_type="GLOBAL",
@@ -110,7 +116,10 @@ mean_obj = add_vector_field(
 vec_fraction_node = mix_geometry_attributes(mean_obj, ['arrow', 'normal_x', 'normal_z'], '_zero', '_wrong')
 bpy.ops.object.select_all(action="DESELECT")
 bpy.data.objects["means"].select_set(True)
+ov=bpy.context.copy()
+ov['area']=[a for a in bpy.context.screen.areas if a.type=="VIEW_3D"][0]
 bpy.ops.transform.rotate(
+    ov,
     value=1.5708,
     orient_axis="Z",
     orient_type="GLOBAL",
@@ -139,6 +148,11 @@ vec_fraction_node.outputs['Value'].keyframe_insert('default_value', frame=30)
 
 bpy.context.scene.frame_end = 30
 
+bpy.context.scene.render.filepath = os.path.join(
+    data_dir, "blank_to_wrong", "renders", f"frame_"
+)
+
+bpy.ops.render.render(use_viewport=True, animation=True, write_still=True)
 
 # # CHANGE COLORS 
 # earth_obj.data.materials.pop(index=0)
