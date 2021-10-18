@@ -47,7 +47,7 @@ grey_arr_obj = create_vector_arrow(color=(0.3,0.3,0.3, 1.0))
 # set_object_collections(backdrop=[bd_obj], instancing=[arr_obj])
 
 frames = 60
-for frame in [0, 29, 59]:
+for frame in range(frames):
     print(frame)
     frame_name = f"frame_{frames - frame - 1}"
     bm = import_bmesh(os.path.join(data_dir, "unwrap_sphere", f"{frame_name}.obj"))
@@ -119,8 +119,8 @@ for frame in [0, 29, 59]:
         data_dir, "unwrap_sphere", "renders", f"frame_{frames - frame - 1}.png"
     )
     set_resolution(1080)
-    # bpy.ops.render.render(use_viewport=True, write_still=True)
-    # for modifier in vf_obj.modifiers:
-    #     bpy.data.node_groups.remove(modifier.node_group, do_unlink=True)
-    # bpy.data.objects.remove(obj, do_unlink=True)
+    bpy.ops.render.render(use_viewport=True, write_still=True)
+    for modifier in vf_obj.modifiers:
+        bpy.data.node_groups.remove(modifier.node_group, do_unlink=True)
+    bpy.data.objects.remove(obj, do_unlink=True)
     # bpy.data.objects.remove(vf_obj, do_unlink=True)
