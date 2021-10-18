@@ -8,10 +8,11 @@ from mathutils import Vector
 from mathutils import Euler
 
 # directory = os.getcwd()
-scripts_dir = "/home/mhutchin/Documents/projects/ExtrinsicGaugeEquivariantVectorGPs/blender_scripts"
-data_dir = "/home/mhutchin/Documents/projects/ExtrinsicGaugeEquivariantVectorGPs/blender"
-texture_path = "/home/mhutchin/Documents/projects/ExtrinsicGaugeEquivariantVectorGPs/textures"
-col_dir = "/home/mhutchin/Documents/projects/ExtrinsicGaugeEquivariantVectorGPs/col"
+base_dir = "/home/mhutchin/Documents/projects/ExtrinsicGaugeEquivariantVectorGPs/"
+scripts_dir = os.path.join(base_dir, "blender_scripts")
+data_dir = os.path.join(base_dir, "blender")
+texture_path = os.path.join(base_dir, "textures")
+col_dir = os.path.join(base_dir, "col")
 
 with open(os.path.join(scripts_dir, "render.py")) as file:
     exec(file.read())
