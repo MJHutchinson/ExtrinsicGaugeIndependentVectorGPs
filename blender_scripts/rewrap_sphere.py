@@ -13,6 +13,8 @@ data_dir = "/home/mhutchin/Documents/projects/ExtrinsicGaugeEquivariantVectorGPs
 texture_path = "/home/mhutchin/Documents/projects/ExtrinsicGaugeEquivariantVectorGPs/textures"
 col_dir = "/home/mhutchin/Documents/projects/ExtrinsicGaugeEquivariantVectorGPs/col"
 
+os.makedirs(os.path.join(data_dir, 'rewrap_sphere', 'renders'), exist_ok=True)
+
 with open(os.path.join(scripts_dir, "render.py")) as file:
     exec(file.read())
 
