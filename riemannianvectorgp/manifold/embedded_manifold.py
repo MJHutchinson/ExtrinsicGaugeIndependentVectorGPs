@@ -1,7 +1,8 @@
 from abc import ABC, ABCMeta, abstractmethod
 from typing import NamedTuple, Tuple
 import jax.numpy as jnp
-from tensorflow_probability.python.internal.backend import jax as tf2jax
+
+# from tensorflow_probability.python.internal.backend import jax as tf2jax
 import numpy as np
 import jax
 from jax import jit
@@ -110,8 +111,11 @@ class AbstractEmbeddedRiemannianManifold(AbstractRiemannianMainfold):
             Tangent vectors in gauge defined by self.projection_matrix
         """
         M = self.e_to_m(X)
-        return M, tf2jax.linalg.matvec(
-            jnp.swapaxes(self.projection_matrix(M), -1, -2), Y
+        return (
+            M,
+            (jnp.swapaxes(self.projection_matrix(M), -1, -2) @ Y[..., np.newaxis])[
+                ..., 0
+            ],
         )
 
     @partial(jit, static_argnums=(0,))
@@ -135,7 +139,7 @@ class AbstractEmbeddedRiemannianManifold(AbstractRiemannianMainfold):
         """
         return (
             self.m_to_e(M),
-            tf2jax.linalg.matvec(self.projection_matrix(M), V),
+            (self.projection_matrix(M) @ V[..., np.newaxis])[..., 0],
         )
 
     @partial(jit, static_argnums=(0,))
@@ -143,9 +147,9 @@ class AbstractEmbeddedRiemannianManifold(AbstractRiemannianMainfold):
         p1 = self.projection_matrix(M1)
         p2 = self.projection_matrix(M2)
         # return jnp.einsum("...iem,...jfn->...jinm", p1, p2)
-        return tf2jax.linalg.matmul(
-            jnp.swapaxes(p2[..., :, np.newaxis, :, :], -1, -2),
-            p1[..., np.newaxis, :, :, :],
+        return (
+            jnp.swapaxes(p2[..., :, np.newaxis, :, :], -1, -2)
+            @ p1[..., np.newaxis, :, :, :],
         )
 
     @partial(jit, static_argnums=(0,))

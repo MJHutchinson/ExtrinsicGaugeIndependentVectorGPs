@@ -277,6 +277,14 @@ def projection_matrix(M, embedding, embedding_dim=3):
     return grad_proj / jnp.linalg.norm(grad_proj, axis=-2)[..., np.newaxis, :]
 
 
+def project(M, V, embedding):
+    X = embedding(M)
+    proj_mat = projection_matrix(M, embedding)
+    Y = (proj_mat @ V[..., np.newaxis])[..., 0]
+
+    return X, Y
+
+
 def import_obj(file):
     vertices = []
     faces = []

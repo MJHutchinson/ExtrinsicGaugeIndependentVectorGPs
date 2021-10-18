@@ -96,7 +96,7 @@ def import_bmesh(mesh_file):
     return bm
 
 
-def import_color(bm, data_file=None, palette_file=None, color=None, bounds=None):
+def import_color(bm, name='color', data_file=None, palette_file=None, color=None, bounds=None):
     if color is None:
         data = np.genfromtxt(data_file, delimiter=",")
         if bounds is None:
@@ -121,10 +121,10 @@ def import_color(bm, data_file=None, palette_file=None, color=None, bounds=None)
     else:
         colors = np.repeat(np.array(color)[:, np.newaxis], len(bm.verts), axis=-1)
 
-    if bm.loops.layers.color.active is not None:
-        bm.loops.layers.color.remove(bm.loops.layers.color.active)
+    # if bm.loops.layers.color.active is not None:
+    #     bm.loops.layers.color.remove(bm.loops.layers.color.active)
 
-    color_layer = bm.loops.layers.color.new("color")
+    color_layer = bm.loops.layers.color.new(name)
     for face in bm.faces:
         for loop in face.loops:
             loop[color_layer] = colors[:, loop.vert.index]
@@ -175,15 +175,46 @@ def add_vertex_colors(obj, shade_smooth=True):
     mat = bpy.data.materials.new(name="Surface Color")
     mat.use_nodes = True
 
-    vertex_color_node = mat.node_tree.nodes.new("ShaderNodeVertexColor")
-    shader_node = mat.node_tree.nodes["Principled BSDF"]
+    vertex_color_keys = list(obj.data.vertex_colors.keys())
 
-    mat.node_tree.links.new(
-        vertex_color_node.outputs["Color"], shader_node.inputs["Base Color"]
-    )
-    mat.node_tree.links.new(
-        vertex_color_node.outputs["Alpha"], shader_node.inputs["Alpha"]
-    )
+    if len(vertex_color_keys) == 1:
+
+        vertex_color_node = mat.node_tree.nodes.new("ShaderNodeVertexColor")
+        shader_node = mat.node_tree.nodes["Principled BSDF"]
+
+        mat.node_tree.links.new(
+            vertex_color_node.outputs["Color"], shader_node.inputs["Base Color"]
+        )
+        mat.node_tree.links.new(
+            vertex_color_node.outputs["Alpha"], shader_node.inputs["Alpha"]
+        )
+
+    elif len(vertex_color_keys) == 2:
+        vertex_color_node_1 = mat.node_tree.nodes.new("ShaderNodeVertexColor")
+        vertex_color_node_2 = mat.node_tree.nodes.new("ShaderNodeVertexColor")
+        vertex_color_node_1.layer_name = vertex_color_keys[0]
+        vertex_color_node_2.layer_name = vertex_color_keys[1]
+
+        mix_node = mat.node_tree.nodes.new("ShaderNodeMixRGB")
+        mix_node.inputs[0].default_value = 0.0
+
+        shader_node = mat.node_tree.nodes["Principled BSDF"]
+
+        mat.node_tree.links.new(
+            mix_node.outputs["Color"], shader_node.inputs["Base Color"]
+        )
+        # mat.node_tree.links.new(
+        #     vertex_color_node.outputs["Alpha"], shader_node.inputs["Alpha"]
+        # )
+        mat.node_tree.links.new(
+            vertex_color_node_1.outputs["Color"], mix_node.inputs["Color1"]
+        )
+        mat.node_tree.links.new(
+            vertex_color_node_2.outputs["Color"], mix_node.inputs["Color2"]
+        )
+
+    else:
+        raise ValueError()
 
     obj.data.materials.clear()
     obj.data.materials.append(mat)
@@ -195,15 +226,17 @@ def add_vertex_colors(obj, shade_smooth=True):
     return mat
 
 
-def import_vector_field(vf_file):
+def import_vector_field(vf_file, bm=None, name = ""):
     vector_field = np.genfromtxt(vf_file, delimiter=",")
     if len(vector_field.shape) == 1:
         vector_field = vector_field[np.newaxis, :]
 
-    bm = bmesh.new()
-    arrow_layer = bm.verts.layers.float_vector.new("arrow")
-    normal_x_layer = bm.verts.layers.float_vector.new("normal_x")
-    normal_z_layer = bm.verts.layers.float_vector.new("normal_z")
+    if bm is None:
+        bm = bmesh.new()
+
+    arrow_layer = bm.verts.layers.float_vector.new("arrow" + name)
+    normal_x_layer = bm.verts.layers.float_vector.new("normal_x" + name)
+    normal_z_layer = bm.verts.layers.float_vector.new("normal_z" + name)
     for row in vector_field:
         vert = bm.verts.new(row[0:3])
         vert[arrow_layer] = row[3:6]
@@ -317,6 +350,35 @@ def add_vector_field(vec_bm, arr_obj, scale=1, name="Vector Field"):
     )
 
     return vf_obj
+
+
+def mix_geometry_attributes(obj, attributes, suffix_1, suffix_2):
+    mod = obj.modifiers[0]
+    input_node = mod.node_group.nodes["Group Input"]
+    prev_node = mod.node_group.nodes['Attribute Vector Math']
+
+    fraction_node = mod.node_group.nodes.new('ShaderNodeValue')
+
+    for attr in attributes:
+        mix_node = mod.node_group.nodes.new('GeometryNodeAttributeMix')
+        mix_node.inputs['A'].default_value = attr + suffix_1
+        mix_node.inputs['B'].default_value = attr + suffix_2
+        mix_node.inputs['Result'].default_value = attr
+
+        mod.node_group.links.new(
+            fraction_node.outputs["Value"], mix_node.inputs[2]
+        )
+        mod.node_group.links.new(
+            input_node.outputs["Geometry"], mix_node.inputs["Geometry"]
+        )
+        mod.node_group.links.new(
+            mix_node.outputs["Geometry"], prev_node.inputs["Geometry"]
+        )
+
+        prev_node = mix_node
+
+    return fraction_node
+
 
 
 def create_vector_arrow(
@@ -911,10 +973,15 @@ def export_poisson_disk_samples(obj, file_name):
 
 def add_texture(mat, texture_file_path):
     shader_node = mat.node_tree.nodes["Principled BSDF"]
-    try:
+
+    if 'Mix' in mat.node_tree.nodes.keys():
+        color_node = mat.node_tree.nodes["Mix"]
+    elif 'Vertex Color' in mat.node_tree.nodes.keys():
         color_node = mat.node_tree.nodes["Vertex Color"]
-    except:
+    elif 'RGB' in mat.node_tree.nodes.keys():
         color_node = mat.node_tree.nodes["RGB"]
+    else:
+        raise ValueError()
 
     texture_node = mat.node_tree.nodes.new("ShaderNodeTexImage")
     texture_node.image = bpy.data.images.load(texture_file_path)

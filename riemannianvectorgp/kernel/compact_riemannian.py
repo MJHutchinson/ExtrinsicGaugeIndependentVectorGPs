@@ -5,14 +5,15 @@ import jax.numpy as jnp
 import jax.random as jr
 from jax import jit
 from functools import partial
-import tensorflow_probability
+
+# import tensorflow_probability
 
 from riemannianvectorgp.manifold import AbstractRiemannianMainfold
 from .kernel import AbstractKLKernel, EigenBasisFunctionState
 from .utils import pairwise_dimension_distance
 
-tfp = tensorflow_probability.experimental.substrates.jax
-tfk = tfp.math.psd_kernels
+# tfp = tensorflow_probability.experimental.substrates.jax
+# tfk = tfp.math.psd_kernels
 
 
 class CompactRiemannianManifoldKernel(AbstractKLKernel):
@@ -99,10 +100,8 @@ class SquaredExponentialCompactRiemannianManifoldKernel(
         self,
         key: jnp.ndarray,
     ) -> SquaredExponentialCompactRiemannianManifoldKernelParams:
-        log_length_scales = jnp.zeros((1))
-        return SquaredExponentialCompactRiemannianManifoldKernelParams(
-            log_length_scales
-        )
+        log_length_scale = jnp.zeros((1))
+        return SquaredExponentialCompactRiemannianManifoldKernelParams(log_length_scale)
 
     @partial(jit, static_argnums=(0,))
     def spectrum(
@@ -127,10 +126,8 @@ class MaternCompactRiemannianManifoldKernel(CompactRiemannianManifoldKernel):
         self,
         key: jnp.ndarray,
     ) -> SquaredExponentialCompactRiemannianManifoldKernelParams:
-        log_length_scales = jnp.zeros((1))
-        return SquaredExponentialCompactRiemannianManifoldKernelParams(
-            log_length_scales
-        )
+        log_length_scale = jnp.zeros((1))
+        return SquaredExponentialCompactRiemannianManifoldKernelParams(log_length_scale)
 
     @partial(jit, static_argnums=(0,))
     def spectrum(

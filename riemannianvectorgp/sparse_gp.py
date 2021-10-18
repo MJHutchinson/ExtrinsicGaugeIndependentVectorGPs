@@ -4,12 +4,13 @@ import jax.numpy as jnp
 import jax.random as jr
 import jax.scipy as jsp
 from functools import partial
-import tensorflow_probability
+
+# import tensorflow_probability
 from tensorflow_probability.python.internal.backend import jax as tf2jax
 from einops import rearrange
 
-tfp = tensorflow_probability.experimental.substrates.jax
-tfk = tfp.math.psd_kernels
+# tfp = tensorflow_probability.experimental.substrates.jax
+# tfk = tfp.math.psd_kernels
 from abc import ABC, abstractmethod
 from .kernel import AbstractKernel, FourierFeatures
 
@@ -377,9 +378,7 @@ class SparseGaussianProcess:
 
     @partial(jax.jit, static_argnums=(0,))
     def hyperprior(
-        self,
-        params: SparseGaussianProcessParameters,
-        state: SparseGaussianProcessState
+        self, params: SparseGaussianProcessParameters, state: SparseGaussianProcessState
     ) -> jnp.ndarray:
         """Returns the log hyperprior regularization term of the GP."""
         return jnp.zeros(())  # temporary
@@ -392,7 +391,7 @@ class SparseGaussianProcess:
         key: jnp.ndarray,
         x: jnp.ndarray,
         y: jnp.ndarray,
-        n_data: int
+        n_data: int,
     ) -> Tuple[jnp.ndarray, SparseGaussianProcessState]:
 
         state = self.randomize(params, state, key)

@@ -188,9 +188,7 @@ y = 2 * jnp.sin(x) + jr.normal(next(rng), x.shape) / 10
 kernel = ScaledKernel(TFPKernel(tfk.ExponentiatedQuadratic, 1, 1))
 kernel_params = kernel.init_params(next(rng))
 sub_kernel_params = kernel_params.sub_kernel_params
-sub_kernel_params = sub_kernel_params._replace(
-    log_length_scales=jnp.log(jnp.array(0.5))
-)
+sub_kernel_params = sub_kernel_params._replace(log_length_scale=jnp.log(jnp.array(0.5)))
 kernel_params = kernel_params._replace(sub_kernel_params=sub_kernel_params)
 kernel_params = kernel_params._replace(
     log_amplitude=-jnp.log(kernel.matrix(kernel_params, x, x)[0, 0, 0])

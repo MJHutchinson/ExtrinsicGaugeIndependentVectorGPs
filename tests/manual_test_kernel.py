@@ -108,7 +108,84 @@ print(mean_err, max_err)
 # %%
 
 print(eval_kernel(kernel, kernel_params, x, next(rng)))
+# %%
+kernel = ScaledKernel(TFPKernel(tfk.MaternOneHalf, 1, 1))
+kernel_params = kernel.init_params(next(rng))
+x = jnp.linspace(-5, 5, 101)[:, np.newaxis]
+num_samples = 20000
+num_basis_functions = 10000
+key = next(rng)
 
+ff = FourierFeatures(kernel, num_basis_functions)
+state = ff.init_state(kernel_params, num_samples, key)
+f = ff(kernel_params, state, x)
+
+k = kernel.matrix(kernel_params, x, x)
+m_ff = jnp.mean(f,axis=0)
+k_ff = jnp.mean(f[..., :, np.newaxis, :, np.newaxis] * f[..., np.newaxis, :, np.newaxis, :], axis=0)
+plot_kernel_approx(x[:,0], jnp.zeros_like(x[:,0]), k[0,:,0,0], m_ff[:,0], k_ff[0,:,0,0])
+# plt.title(f"Square exponential, samples: {num_samples}, basis functions: {num_basis_functions}")
+# %%
+i = 50
+plot_kernel_approx(x[:,0], jnp.zeros_like(x[:,0]), k[i,:,0,0], m_ff[:,0], k_ff[i,:,0,0])
+
+# %%
+
+k_err = k - k_ff
+mean_err = jnp.mean(k_err)
+max_err = jnp.max(jnp.abs(k_err))
+
+print(mean_err, max_err)
+# %%
+kernel = TFPKernel(tfk.MaternThreeHalves, 1, 1)
+kernel_params = kernel.init_params(next(rng))
+kernel_params = kernel_params._replace(log_length_scale=jnp.log(3.0))
+x = jnp.linspace(-5, 5, 101)[:, np.newaxis]
+num_samples = 20000
+num_basis_functions = 10000
+key = next(rng)
+
+ff = FourierFeatures(kernel, num_basis_functions)
+state = ff.init_state(kernel_params, num_samples, key)
+f = ff(kernel_params, state, x)
+
+k = kernel.matrix(kernel_params, x, x)
+m_ff = jnp.mean(f,axis=0)
+k_ff = jnp.mean(f[..., :, np.newaxis, :, np.newaxis] * f[..., np.newaxis, :, np.newaxis, :], axis=0)
+plot_kernel_approx(x[:,0], jnp.zeros_like(x[:,0]), k[0,:,0,0], m_ff[:,0], k_ff[0,:,0,0])
+# plt.title(f"Square exponential, samples: {num_samples}, basis functions: {num_basis_functions}")
+# %%
+i = 50
+plot_kernel_approx(x[:,0], jnp.zeros_like(x[:,0]), k[i,:,0,0], m_ff[:,0], k_ff[i,:,0,0])
+
+# %%
+kernel = ScaledKernel(TFPKernel(tfk.MaternFiveHalves, 1, 1))
+kernel_params = kernel.init_params(next(rng))
+x = jnp.linspace(-5, 5, 101)[:, np.newaxis]
+num_samples = 20000
+num_basis_functions = 10000
+key = next(rng)
+
+ff = FourierFeatures(kernel, num_basis_functions)
+state = ff.init_state(kernel_params, num_samples, key)
+f = ff(kernel_params, state, x)
+
+k = kernel.matrix(kernel_params, x, x)
+m_ff = jnp.mean(f,axis=0)
+k_ff = jnp.mean(f[..., :, np.newaxis, :, np.newaxis] * f[..., np.newaxis, :, np.newaxis, :], axis=0)
+plot_kernel_approx(x[:,0], jnp.zeros_like(x[:,0]), k[0,:,0,0], m_ff[:,0], k_ff[0,:,0,0])
+# plt.title(f"Square exponential, samples: {num_samples}, basis functions: {num_basis_functions}")
+# %%
+i = 50
+plot_kernel_approx(x[:,0], jnp.zeros_like(x[:,0]), k[i,:,0,0], m_ff[:,0], k_ff[i,:,0,0])
+
+# %%
+
+k_err = k - k_ff
+mean_err = jnp.mean(k_err)
+max_err = jnp.max(jnp.abs(k_err))
+
+print(mean_err, max_err)
 # %%
 
 kernel = SquaredExponentialCompactRiemannianManifoldKernel(S1(0.5), truncation = 500)

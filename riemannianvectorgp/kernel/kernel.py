@@ -6,11 +6,12 @@ import jax.numpy as jnp
 import jax.random as jr
 from jax import jit
 from functools import partial
-import tensorflow_probability
-from tensorflow_probability.python.internal.backend import jax as tf2jax
 
-tfp = tensorflow_probability.experimental.substrates.jax
-tfk = tfp.math.psd_kernels
+# import tensorflow_probability
+# from tensorflow_probability.python.internal.backend import jax as tf2jax
+
+# tfp = tensorflow_probability.experimental.substrates.jax
+# tfk = tfp.math.psd_kernels
 
 
 class EigenBasisFunctionState(NamedTuple):

@@ -104,7 +104,7 @@ def test_ExponentialQuadratic():
     for ls in jnp.linspace(0.01, 10, 20):
         kernel = TFPKernel(tfk.ExponentiatedQuadratic, 1, 1)
         kernel_params = kernel.init_params(next(rng))
-        kernel_params = kernel_params._replace(log_length_scales=jnp.log(ls))
+        kernel_params = kernel_params._replace(log_length_scale=jnp.log(ls))
         x = jnp.linspace(-5, 5, 101)[:, np.newaxis]
         key = next(rng)
         eval_kernel(kernel, kernel_params, x, key)

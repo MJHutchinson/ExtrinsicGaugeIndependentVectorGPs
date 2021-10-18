@@ -29,6 +29,7 @@ from riemannianvectorgp.utils import (
     sphere_m_to_3d,
     interp,
     projection_matrix,
+    project
 )
 import potpourri3d as pp3d
 

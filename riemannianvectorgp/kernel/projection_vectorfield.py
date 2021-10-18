@@ -5,15 +5,17 @@ import jax.numpy as jnp
 import jax.random as jr
 from jax import jit
 from functools import partial
-import tensorflow_probability
-from tensorflow_probability.python.internal.backend import jax as tf2jax
+
+# import tensorflow_probability
+
+# from tensorflow_probability.python.internal.backend import jax as tf2jax
 
 from riemannianvectorgp.manifold import AbstractEmbeddedRiemannianManifold
 from .kernel import AbstractKLKernel, AbstractKernel, EigenBasisFunctionState
 from .utils import pairwise_dimension_distance
 
-tfp = tensorflow_probability.experimental.substrates.jax
-tfk = tfp.math.psd_kernels
+# tfp = tensorflow_probability.experimental.substrates.jax
+# tfk = tfp.math.psd_kernels
 
 
 class ManifoldProjectionVectorKernel(AbstractKLKernel):

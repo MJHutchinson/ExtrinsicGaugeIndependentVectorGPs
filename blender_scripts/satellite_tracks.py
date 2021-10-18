@@ -22,12 +22,12 @@ with open(os.path.join(scripts_dir, "render.py")) as file:
 reset_scene()
 # set_renderer_settings(num_samples=2048 if bpy.app.background else 128)
 set_renderer_settings(num_samples=16 if bpy.app.background else 128)
-setup_layers()
-setup_compositor(
-    mask_center=(0.5, 0.3125),
-    mask_size=(0.675, 0.325),
-    shadow_color_correction_exponent=2.75,
-)
+# setup_layers()
+# setup_compositor(
+#     mask_center=(0.5, 0.3125),
+#     mask_size=(0.675, 0.325),
+#     shadow_color_correction_exponent=2.75,
+# )
 (cam_axis, cam_obj) = setup_camera(
     distance=15.5,
     # angle=(-np.pi / 16, 0, 0),
@@ -180,7 +180,7 @@ for i in range(len(track)):
     track_objs.append(vf_obj)
 
 
-set_object_collections(object=[earth_obj, satellite_obj, *track_objs])
+# set_object_collections(object=[earth_obj, satellite_obj, *track_objs])
 
 
 # for i in range(len(track)):
@@ -210,7 +210,7 @@ for i in range(len(track) - 1):
 bpy.context.scene.render.filepath = os.path.join(
     data_dir, "satellite_tracks", "renders", "frame"
 )
-set_resolution(480)
+set_resolution(1080)
 bpy.context.scene.frame_end = max_frame
 bpy.context.scene.frame_current = bpy.context.scene.frame_start
 bpy.ops.render.render(use_viewport=True, animation=True, write_still=True)

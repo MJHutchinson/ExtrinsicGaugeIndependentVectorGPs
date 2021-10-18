@@ -21,12 +21,12 @@ with open(os.path.join(scripts_dir, "render.py")) as file:
 reset_scene()
 # set_renderer_settings(num_samples=2048 if bpy.app.background else 128)
 set_renderer_settings(num_samples=16 if bpy.app.background else 128)
-setup_layers()
-setup_compositor(
-    mask_center=(0.5, 0.3125),
-    mask_size=(0.675, 0.325),
-    shadow_color_correction_exponent=2.75,
-)
+# setup_layers()
+# setup_compositor(
+#     mask_center=(0.5, 0.3125),
+#     mask_size=(0.675, 0.325),
+#     shadow_color_correction_exponent=2.75,
+# )
 (cam_axis, cam_obj) = setup_camera(
     distance=15.5,
     # angle=(-np.pi / 16, 0, 0),
@@ -48,7 +48,7 @@ arr_obj = create_vector_arrow(color=(1, 0, 0, 1))
 set_object_collections(backdrop=[bd_obj], instancing=[arr_obj])
 
 
-for frame in [0, 29, 59]:
+for frame in [59]:
     print(frame)
     frame_name = f"frame_{frame}"
     bm = import_bmesh(os.path.join(data_dir, "unwrap_sphere", f"{frame_name}.obj"))
@@ -125,11 +125,11 @@ for frame in [0, 29, 59]:
     # )
     # vf_obj.data.materials.append(red_mat)
     # bpy.ops.object.duplicates_make_real()
-    set_object_collections(object=[obj, vf_obj])
+    # set_object_collections(object=[obj, vf_obj])
     bpy.context.scene.render.filepath = os.path.join(
         data_dir, "unwrap_sphere", "renders", f"frame_{frame}.png"
     )
-    set_resolution(480)
+    set_resolution(1080)
     # bpy.ops.render.render(use_viewport=True, write_still=True)
     # for modifier in vf_obj.modifiers:
     #     bpy.data.node_groups.remove(modifier.node_group, do_unlink=True)

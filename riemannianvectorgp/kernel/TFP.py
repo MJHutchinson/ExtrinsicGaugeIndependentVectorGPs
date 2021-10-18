@@ -15,7 +15,7 @@ from .kernel import AbstractRFFKernel, RandomBasisFunctionState
 
 
 class TFPKernelParameters(NamedTuple):
-    log_length_scales: jnp.ndarray
+    log_length_scale: jnp.ndarray
 
 
 class TFPKernel(AbstractRFFKernel):
@@ -44,10 +44,10 @@ class TFPKernel(AbstractRFFKernel):
         key: jnp.ndarray,
     ) -> TFPKernelParameters:
         if self.input_dimension == 1:
-            log_length_scales = jnp.zeros(())
+            log_length_scale = jnp.zeros(())
         else:
-            log_length_scales = jnp.zeros((self.input_dimension))
-        return TFPKernelParameters(log_length_scales)
+            log_length_scale = jnp.zeros((self.input_dimension))
+        return TFPKernelParameters(log_length_scale)
 
     @partial(jit, static_argnums=(0,))
     def matrix(
@@ -62,9 +62,9 @@ class TFPKernel(AbstractRFFKernel):
             x1: the first input.
             x2: the second input.
         """
-        length_scales = jnp.exp(params.log_length_scales)
+        length_scales = jnp.exp(params.log_length_scale)
         tfp_kernel = self.tfp_class(amplitude=None, length_scale=length_scales)
-        return tfp_kernel.matrix(x1, x2)[..., np.newaxis, np.newaxis] * jnp.eye(
+        return tfp_kernel.matrix(x1, x2)[0, ..., np.newaxis, np.newaxis] * jnp.eye(
             self.output_dimension
         )
 
@@ -182,7 +182,7 @@ class TFPKernel(AbstractRFFKernel):
         x: jnp.ndarray,
     ) -> jnp.ndarray:
 
-        length_scales = jnp.exp(params.log_length_scales)
+        length_scales = jnp.exp(params.log_length_scale)
 
         frequency = state.frequency
         phase = state.phase
@@ -201,3 +201,13 @@ class TFPKernel(AbstractRFFKernel):
         # print(phase.shape)
         # print(basis_fn.shape)
         return basis_fn[..., np.newaxis]
+
+
+class MaternThreeHalves:
+    def __init__(self, amplitude, length_scales):
+        self.length_scales = length_scales
+        self.amplitude = amplitude
+
+    def matrix(x1, x2):
+        z = sqrt(3) * jnp.linalg.norm((x1 - x2) / self.length_scale, axis=-1)
+        return self.amplitude ** 2 * (1 + z) * exp(-z)

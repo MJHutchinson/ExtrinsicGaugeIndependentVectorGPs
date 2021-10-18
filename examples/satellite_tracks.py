@@ -118,5 +118,3 @@ np.savetxt(f"blender/satellite_tracks/track_vecs.csv", track_vecs, delimiter=','
 np.savetxt(f"blender/satellite_tracks/track_intrinsic_vecs.csv", track_vecs_intrinsic, delimiter=',')
 
 # %%
-
-# %%
