@@ -7,11 +7,13 @@ import os
 from mathutils import Vector
 from mathutils import Euler
 
-base_dir = "/home/mhutchin/Documents/projects/ExtrinsicGaugeEquivariantVectorGPs/"
+base_dir = "/home/mjhutchinson/Documents/projects/ExtrinsicGaugeEquivariantVectorGPs/"
 scripts_dir = os.path.join(base_dir, "blender_scripts")
 data_dir = os.path.join(base_dir, "blender")
 texture_path = os.path.join(base_dir, "textures")
 col_dir = os.path.join(base_dir, "col")
+
+os.makedirs(os.path.join(data_dir, 'satellite_tracks', 'renders'), exist_ok=True)
 
 with open(os.path.join(scripts_dir, "render.py")) as file:
     exec(file.read())
@@ -19,6 +21,7 @@ with open(os.path.join(scripts_dir, "render.py")) as file:
 reset_scene()
 # set_renderer_settings(num_samples=2048 if bpy.app.background else 128)
 set_renderer_settings(num_samples=16 if bpy.app.background else 128)
+print(bpy.app.background)
 # setup_layers()
 # setup_compositor(
 #     mask_center=(0.5, 0.3125),

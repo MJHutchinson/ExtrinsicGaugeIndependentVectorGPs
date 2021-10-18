@@ -8,7 +8,7 @@ from mathutils import Vector
 from mathutils import Euler
 
 # directory = os.getcwd()
-base_dir = "/home/mhutchin/Documents/projects/ExtrinsicGaugeEquivariantVectorGPs/"
+base_dir = "/home/mjhutchinson/Documents/projects/ExtrinsicGaugeEquivariantVectorGPs/"
 scripts_dir = os.path.join(base_dir, "blender_scripts")
 data_dir = os.path.join(base_dir, "blender")
 texture_path = os.path.join(base_dir, "textures")
@@ -50,7 +50,7 @@ grey_arr_obj = create_vector_arrow(color=(0.3,0.3,0.3, 1.0))
 # set_object_collections(backdrop=[bd_obj], instancing=[arr_obj])
 
 frames = 60
-for frame in [0]:
+for frame in range(frames):
     print(frame)
     frame_name = f"frame_{frames - frame - 1}"
     bm = import_bmesh(os.path.join(data_dir, "unwrap_sphere", f"{frame_name}.obj"))
@@ -129,7 +129,7 @@ for frame in [0]:
         use_proportional_projected=False,
     )
     bpy.context.scene.render.filepath = os.path.join(
-        data_dir, "rewrap_sphere", "renders", f"frame_{frames - frame - 1}.png"
+        data_dir, "rewrap_sphere", "renders", f"frame_{frames - frame - 1:04d}.png"
     )
     set_resolution(1080)
     bpy.ops.render.render(use_viewport=True, write_still=True)

@@ -7,11 +7,13 @@ from mathutils import Vector
 
 
 # directory = os.getcwd()
-base_dir = "/home/mhutchin/Documents/projects/ExtrinsicGaugeEquivariantVectorGPs/"
+base_dir = "/home/mjhutchinson/Documents/projects/ExtrinsicGaugeEquivariantVectorGPs/"
 scripts_dir = os.path.join(base_dir, "blender_scripts")
 data_dir = os.path.join(base_dir, "blender")
 texture_path = os.path.join(base_dir, "textures")
 col_dir = os.path.join(base_dir, "col")
+
+os.makedirs(os.path.join(data_dir, 'unwrap_sphere', 'renders'), exist_ok=True)
 
 with open(os.path.join(scripts_dir, "render.py")) as file:
     exec(file.read())
@@ -44,8 +46,8 @@ setup_lighting(
 bd_obj = create_backdrop(location=(0, 0, -2), scale=(10, 5, 5))
 arr_obj = create_vector_arrow(color=(1, 0, 0, 1))
 
-
-for frame in [59]:
+frames = 60
+for frame in range(frames):
     print(frame)
     frame_name = f"frame_{frame}"
     bm = import_bmesh(os.path.join(data_dir, "unwrap_sphere", f"{frame_name}.obj"))
@@ -97,7 +99,7 @@ for frame in [59]:
         use_proportional_projected=False,
     )
     bpy.context.scene.render.filepath = os.path.join(
-        data_dir, "unwrap_sphere", "renders", f"frame_{frame}.png"
+        data_dir, "unwrap_sphere", "renders", f"frame_{frame:04d}.png"
     )
     set_resolution(1080)
     bpy.ops.render.render(use_viewport=True, write_still=True)
