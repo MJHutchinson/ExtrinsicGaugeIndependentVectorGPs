@@ -140,8 +140,37 @@ data_path = "/home/mhutchin/Documents/projects/ExtrinsicGaugeEquivariantVectorGP
 np.savetxt(os.path.join(data_path, 'mean_zero.csv'), jnp.concatenate([*project(m, jnp.zeros_like(mean_wrong), sphere_flat_m_to_3d)], axis=-1), delimiter=',')
 np.savetxt(os.path.join(data_path, 'mean_wrong.csv'), jnp.concatenate([*project(m, mean_wrong, sphere_flat_m_to_3d)], axis=-1), delimiter=',')
 np.savetxt(os.path.join(data_path, 'mean_right.csv'), jnp.concatenate([*project(m, mean_right, sphere_flat_m_to_3d)], axis=-1), delimiter=',')
+# np.savetxt(os.path.join(data_path, 'mean_right_sphere.csv'), jnp.concatenate([*project(m, mean_right, sphere_m_to_3d)], axis=-1), delimiter=',')
+# np.savetxt(os.path.join(data_path, 'mean_right_flat.csv'), jnp.concatenate([project(m, mean_right, sphere_flat_m_to_3d)[0], project(m, mean_right, sphere_m_to_3d)[1]], axis=-1), delimiter=',')
 np.savetxt(os.path.join(data_path, 's_wrong.csv'), s_wrong, delimiter=',')
 np.savetxt(os.path.join(data_path, 's_right.csv'), s_right, delimiter=',')
+
+frames = 60
+frame_meshes = []
+frame_vecs = []
+for i in range(frames):
+    embedding_func = lambda m: interp(
+        m, sphere_m_to_3d, sphere_flat_m_to_3d, t=i / (frames - 1)
+    )
+    proj_mat_func = lambda m: projection_matrix(m, embedding_func)
+
+    V, F = (
+        *mesh_to_polyscope(
+            embedding_func(m).reshape((num_points, num_points, 3)),
+            wrap_x=False,
+            wrap_y=False,
+        ),
+    )
+
+    euclidean_vecs = (proj_mat_func(m) @ mean_right[..., np.newaxis])[..., 0]
+
+    frame_meshes.append((V,F))
+    frame_vecs.append((embedding_func(m), euclidean_vecs))
+
+for i, ((V, F), (TP, TV)) in enumerate(zip(frame_meshes, frame_vecs)):
+    print(i)
+    # save_obj(mesh_to_obj(V, F, uv_coords=m / jnp.array([jnp.pi, 2 * jnp.pi])), f"blender/unwrap_sphere/frame_{i}.obj")
+    export_vec_field(TP, TV, f"blender/rewrap_sphere/frame_{i}.csv")
 
 
 # %%
