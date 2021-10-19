@@ -35,10 +35,10 @@ render = scene.render
 scene.frame_start = 1
 scene.frame_end = len(files)
 
-# render.resolution_x = 1920
-# render.resolution_y = 1080
-render.resolution_x = 2250
-render.resolution_y = 1500
+render.resolution_x = 1920
+render.resolution_y = 1080
+# render.resolution_x = 2250
+# render.resolution_y = 1500
 render.fps = 30
 
 render.image_settings.file_format = 'FFMPEG'

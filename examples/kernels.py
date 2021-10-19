@@ -77,8 +77,20 @@ sphere_mesh = ps.register_surface_mesh(
     smooth_shade=True,
     material="wax",
 )
+round_sphere_mesh = ps.register_surface_mesh(
+    "Flat sphere",
+    *mesh_to_polyscope(
+        sphere_m_to_3d(m_sphere).reshape((num_points, num_points, 3)),
+        wrap_x=False,
+        wrap_y=False,
+    ),
+    color=(1, 1, 1),
+    smooth_shade=True,
+    material="wax",
+)
 # sphere_mesh.set_vertex_tangent_basisX(projection_matrix(m, sphere_flat_m_to_3d)[..., 0])
 point_cloud = ps.register_point_cloud('poisson', sphere_flat_m_to_3d(m))
+round_point_cloud = ps.register_point_cloud('poisson', sphere_m_to_3d(m))
 # %%
 track_points = np.genfromtxt(
     f"blender/satellite_tracks/track_angles.csv", delimiter=","
@@ -147,12 +159,35 @@ point_cloud.add_vector_quantity('mean_right', project(m, mean_right, sphere_flat
 sphere_mesh.add_scalar_quantity('variance_right', s_right)
 
 # %%
+from riemannianvectorgp.sparse_gp import SparseGaussianProcess
+
+kernel = MaternCompactRiemannianManifoldKernel(1.5, EmbeddedS2(), 144)
+rng = GlobalRNG(0)
+kernel = MaternCompactRiemannianManifoldKernel(1.5, S2, 144)
+gp = SparseGaussianProcess(kernel, 1, 144, 5)
+(params, state) = gp.init_params_with_state(next(rng))
+params = params._replace(
+    kernel_params=params.kernel_params._replace(log_length_scale=jnp.log(0.1))
+)
+state = gp.randomize(params, state, next(rng))
+samples = gp.prior(params.kernel_params, state.prior_state, m)
+
+# %%
+
+euc_vecs = samples[:3, :, 0].T
+proj_vecs = S2.project_to_e(*S2.project_to_m(S2.m_to_e(m), euc_vecs))[1]
+round_point_cloud.add_vector_quantity('sample', euc_vecs)
+round_point_cloud.add_vector_quantity('proj samples', proj_vecs)
+
+# %%
 data_path = "/home/mhutchin/Documents/projects/ExtrinsicGaugeEquivariantVectorGPs/blender/kernels"
 np.savetxt(os.path.join(data_path, 'mean_zero.csv'), jnp.concatenate([*project(m, jnp.zeros_like(mean_wrong), sphere_flat_m_to_3d)], axis=-1), delimiter=',')
 np.savetxt(os.path.join(data_path, 'mean_wrong.csv'), jnp.concatenate([*project(m, mean_wrong, sphere_flat_m_to_3d)], axis=-1), delimiter=',')
 np.savetxt(os.path.join(data_path, 'mean_right.csv'), jnp.concatenate([*project(m, mean_right, sphere_flat_m_to_3d)], axis=-1), delimiter=',')
 np.savetxt(os.path.join(data_path, 'mean_wrong_sphere.csv'), jnp.concatenate([*project(m, mean_wrong, sphere_m_to_3d)], axis=-1), delimiter=',')
 np.savetxt(os.path.join(data_path, 'mean_right_sphere.csv'), jnp.concatenate([*project(m, mean_right, sphere_m_to_3d)], axis=-1), delimiter=',')
+np.savetxt(os.path.join(data_path, 'sample_vecs.csv'), jnp.concatenate([S2.m_to_e(m), euc_vecs], axis=-1), delimiter=',')
+np.savetxt(os.path.join(data_path, 'projected_vecs.csv'), jnp.concatenate([S2.m_to_e(m), proj_vecs], axis=-1), delimiter=',')
 
 # np.savetxt(os.path.join(data_path, 'mean_right_sphere.csv'), jnp.concatenate([*project(m, mean_right, sphere_m_to_3d)], axis=-1), delimiter=',')
 # np.savetxt(os.path.join(data_path, 'mean_right_flat.csv'), jnp.concatenate([project(m, mean_right, sphere_flat_m_to_3d)[0], project(m, mean_right, sphere_m_to_3d)[1]], axis=-1), delimiter=',')

@@ -237,8 +237,13 @@ def import_vector_field(vf_file, bm=None, name = ""):
     arrow_layer = bm.verts.layers.float_vector.new("arrow" + name)
     normal_x_layer = bm.verts.layers.float_vector.new("normal_x" + name)
     normal_z_layer = bm.verts.layers.float_vector.new("normal_z" + name)
-    for row in vector_field:
-        vert = bm.verts.new(row[0:3])
+
+    if len(bm.verts) == 0:
+        for row in vector_field:
+            vert = bm.verts.new(row[0:3])
+
+    for vert, row in zip(bm.verts, vector_field):
+        # vert = bm.verts.new(row[0:3])
         vert[arrow_layer] = row[3:6]
         if row.size == 12:
             vert[normal_x_layer] = row[6:9]
@@ -849,10 +854,12 @@ def create_backdrop(location, scale):
     return obj
 
 
-def set_resolution(height, crop=None):
+def set_resolution(height, crop=None, aspect=(3, 2)):
     scene = bpy.data.scenes["Scene"]
-    scene.render.resolution_x = height // 2 * 3
+    scene.render.resolution_x = height // aspect[1] * aspect[0]
     scene.render.resolution_y = height
+
+    print(scene.render.resolution_x, scene.render.resolution_y)
 
     if crop is not None:
         if np.array_equal(np.array(crop), np.array((0, 1, 0, 1))):

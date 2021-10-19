@@ -8,35 +8,24 @@ from mathutils import Vector
 from mathutils import Euler
 
 # directory = os.getcwd()
-base_dir = "/home/mhutchin/Documents/projects/ExtrinsicGaugeEquivariantVectorGPs/"
+base_dir = os.path.expanduser("~/Documents/projects/ExtrinsicGaugeEquivariantVectorGPs/")
 scripts_dir = os.path.join(base_dir, "blender_scripts")
 data_dir = os.path.join(base_dir, "blender")
 texture_path = os.path.join(base_dir, "textures")
 col_dir = os.path.join(base_dir, "col")
 
-os.makedirs(os.path.join(data_dir, 'kernels', 'renders'), exist_ok=True)
-
+os.makedirs(os.path.join(data_dir, 'blank_to_wrong', 'renders'), exist_ok=True)
 
 with open(os.path.join(scripts_dir, "render.py")) as file:
     exec(file.read())
 
 reset_scene()
-# set_renderer_settings(num_samples=2048 if bpy.app.background else 128)
-set_renderer_settings(num_samples=128 if bpy.app.background else 128)
-# setup_layers()
-# setup_compositor(
-#     mask_center=(0.5, 0.3125),
-#     mask_size=(0.675, 0.325),
-#     shadow_color_correction_exponent=2.75,
-# )
+set_renderer_settings(num_samples=16 if bpy.app.background else 128)
 (cam_axis, cam_obj) = setup_camera(
     distance=15.5,
-    # angle=(-np.pi / 16, 0, 0),
     angle=(0, 0, 0),
     lens=85,
-    # height=2560,
     height=1500,
-    # crop=(1 / 5, 9 / 10, 0, 10 / 11),
 )
 setup_lighting(
     shifts=(-10, -10, 10),
@@ -45,6 +34,8 @@ setup_lighting(
     horizontal_angles=(-np.pi / 6, np.pi / 3, np.pi / 3),
     vertical_angles=(-np.pi / 3, -np.pi / 6, np.pi / 4),
 )
+set_resolution(1080, aspect=(16,9))
+
 bd_obj = create_backdrop(location=(0, 0, -2), scale=(10, 5, 5))
 arr_obj = create_vector_arrow(color=(1, 0, 0, 1))
 # set_object_collections(backdrop=[bd_obj], instancing=[arr_obj])
@@ -83,22 +74,22 @@ bpy.context.scene.render.filepath = os.path.join(
     data_dir, "kernels", "renders", 'wrong_front.png'
 )
 empty.rotation_euler = Euler((0,0,math.radians(90)), "XYZ")
-# bpy.ops.render.render(use_viewport=True, write_still=True)
+bpy.ops.render.render(use_viewport=True, write_still=True)
 
 bpy.context.scene.render.filepath = os.path.join(
     data_dir, "kernels", "renders", 'wrong_back.png'
 )
 empty.rotation_euler = Euler((0,0,-math.radians(90)), "XYZ")
-# bpy.ops.render.render(use_viewport=True, write_still=True)
+bpy.ops.render.render(use_viewport=True, write_still=True)
 
 bpy.context.scene.render.filepath = os.path.join(
     data_dir, "kernels", "renders", 'wrong_top.png'
 )
 empty.rotation_euler = Euler((0,-math.radians(90),math.radians(90)), "XYZ")
-# bpy.ops.render.render(use_viewport=True, write_still=True)
+bpy.ops.render.render(use_viewport=True, write_still=True)
 
 bpy.context.scene.render.filepath = os.path.join(
     data_dir, "kernels", "renders", 'wrong_bottom.png'
 )
 empty.rotation_euler = Euler((0,math.radians(90),math.radians(90)), "XYZ")
-# bpy.ops.render.render(use_viewport=True, write_still=True)
+bpy.ops.render.render(use_viewport=True, write_still=True)
