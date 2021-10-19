@@ -21,7 +21,7 @@ with open(os.path.join(scripts_dir, "render.py")) as file:
 reset_scene()
 # set_renderer_settings(num_samples=2048 if bpy.app.background else 128)
 set_renderer_settings(num_samples=128 if bpy.app.background else 128)
-print(bpy.app.background)
+set_resolution(1080)
 # setup_layers()
 # setup_compositor(
 #     mask_center=(0.5, 0.3125),
@@ -51,8 +51,10 @@ bm = import_bmesh(os.path.join(data_dir, "unwrap_sphere", "frame_0.obj"))
 earth_obj = add_mesh(bm, name="Earth")
 bpy.ops.object.select_all(action="DESELECT")
 bpy.data.objects["Earth"].select_set(True)
+
 ov=bpy.context.copy()
 ov['area']=[a for a in bpy.context.screen.areas if a.type=="VIEW_3D"][0]
+
 bpy.ops.transform.rotate(
     ov,
     value=1.5708,
@@ -78,7 +80,7 @@ bpy.ops.import_scene.obj(
 satellite_obj = bpy.context.selected_objects[0]
 satellite_obj.rotation_euler = Euler((math.radians(90), 0, 0), "ZXY")
 bpy.ops.transform.translate(
-    value=(0, 0, 2),
+    value=(0, 0, 1.7),
     orient_type="GLOBAL",
     orient_matrix=((1, 0, 0), (0, 1, 0), (0, 0, 1)),
     orient_matrix_type="GLOBAL",
@@ -91,7 +93,7 @@ bpy.ops.transform.translate(
     use_proportional_projected=False,
 )
 bpy.ops.transform.resize(
-    value=(0.05, 0.05, 0.05),
+    value=(0.025, 0.025, 0.025),
     orient_type="GLOBAL",
     orient_matrix=((1, 0, 0), (0, 1, 0), (0, 0, 1)),
     orient_matrix_type="GLOBAL",
@@ -129,8 +131,6 @@ for i in range(len(track)):
     vf_obj = add_vector_field(vf_bm, arr_obj, scale=3, name=f"vec_{i}")
     bpy.ops.object.select_all(action="DESELECT")
     bpy.data.objects[f"vec_{i}"].select_set(True)
-    ov=bpy.context.copy()
-    ov['area']=[a for a in bpy.context.screen.areas if a.type=="VIEW_3D"][0]
     bpy.ops.transform.rotate(
         ov,
         value=1.5708,
@@ -183,7 +183,7 @@ bpy.context.scene.render.filepath = os.path.join(
 set_resolution(1080)
 bpy.context.scene.frame_end = max_frame
 bpy.context.scene.frame_current = bpy.context.scene.frame_start
-bpy.ops.render.render(use_viewport=True, animation=True, write_still=True)
+# bpy.ops.render.render(use_viewport=True, animation=True, write_still=True)
 # for modifier in vf_obj.modifiers:
 #     bpy.data.node_groups.remove(modifier.node_group, do_unlink=True)
 # bpy.data.objects.remove(obj, do_unlink=True)

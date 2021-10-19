@@ -21,6 +21,7 @@ with open(os.path.join(scripts_dir, "render.py")) as file:
 reset_scene()
 # set_renderer_settings(num_samples=2048 if bpy.app.background else 128)
 set_renderer_settings(num_samples=128 if bpy.app.background else 128)
+set_resolution(1080)
 # setup_layers()
 # setup_compositor(
 #     mask_center=(0.5, 0.3125),
@@ -84,8 +85,6 @@ vf_obj = add_vector_field(
 )
 bpy.ops.object.select_all(action="DESELECT")
 bpy.data.objects["observations"].select_set(True)
-ov=bpy.context.copy()
-ov['area']=[a for a in bpy.context.screen.areas if a.type=="VIEW_3D"][0]
 bpy.ops.transform.rotate(
     ov,
     value=1.5708,
@@ -118,8 +117,6 @@ mean_obj = add_vector_field(
 vec_fraction_node = mix_geometry_attributes(mean_obj, ['arrow', 'normal_x', 'normal_z'], '_wrong', '_right')
 bpy.ops.object.select_all(action="DESELECT")
 bpy.data.objects["means"].select_set(True)
-ov=bpy.context.copy()
-ov['area']=[a for a in bpy.context.screen.areas if a.type=="VIEW_3D"][0]
 bpy.ops.transform.rotate(
     ov,
     value=1.5708,

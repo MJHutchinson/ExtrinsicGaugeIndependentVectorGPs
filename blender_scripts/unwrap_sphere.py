@@ -21,6 +21,7 @@ with open(os.path.join(scripts_dir, "render.py")) as file:
 reset_scene()
 # set_renderer_settings(num_samples=2048 if bpy.app.background else 128)
 set_renderer_settings(num_samples=128 if bpy.app.background else 128)
+set_resolution(1080)
 # setup_layers()
 # setup_compositor(
 #     mask_center=(0.5, 0.3125),
@@ -101,7 +102,6 @@ for frame in range(frames):
     bpy.context.scene.render.filepath = os.path.join(
         data_dir, "unwrap_sphere", "renders", f"frame_{frame:04d}.png"
     )
-    set_resolution(1080)
     bpy.ops.render.render(use_viewport=True, write_still=True)
     for modifier in vf_obj.modifiers:
         bpy.data.node_groups.remove(modifier.node_group, do_unlink=True)

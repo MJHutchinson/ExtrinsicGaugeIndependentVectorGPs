@@ -23,6 +23,7 @@ with open(os.path.join(scripts_dir, "render.py")) as file:
 reset_scene()
 # set_renderer_settings(num_samples=2048 if bpy.app.background else 128)
 set_renderer_settings(num_samples=128 if bpy.app.background else 128)
+set_resolution(1080)
 # setup_layers()
 # setup_compositor(
 #     mask_center=(0.5, 0.3125),
