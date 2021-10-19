@@ -151,6 +151,9 @@ data_path = "/home/mhutchin/Documents/projects/ExtrinsicGaugeEquivariantVectorGP
 np.savetxt(os.path.join(data_path, 'mean_zero.csv'), jnp.concatenate([*project(m, jnp.zeros_like(mean_wrong), sphere_flat_m_to_3d)], axis=-1), delimiter=',')
 np.savetxt(os.path.join(data_path, 'mean_wrong.csv'), jnp.concatenate([*project(m, mean_wrong, sphere_flat_m_to_3d)], axis=-1), delimiter=',')
 np.savetxt(os.path.join(data_path, 'mean_right.csv'), jnp.concatenate([*project(m, mean_right, sphere_flat_m_to_3d)], axis=-1), delimiter=',')
+np.savetxt(os.path.join(data_path, 'mean_wrong_sphere.csv'), jnp.concatenate([*project(m, mean_wrong, sphere_m_to_3d)], axis=-1), delimiter=',')
+np.savetxt(os.path.join(data_path, 'mean_right_sphere.csv'), jnp.concatenate([*project(m, mean_right, sphere_m_to_3d)], axis=-1), delimiter=',')
+
 # np.savetxt(os.path.join(data_path, 'mean_right_sphere.csv'), jnp.concatenate([*project(m, mean_right, sphere_m_to_3d)], axis=-1), delimiter=',')
 # np.savetxt(os.path.join(data_path, 'mean_right_flat.csv'), jnp.concatenate([project(m, mean_right, sphere_flat_m_to_3d)[0], project(m, mean_right, sphere_m_to_3d)[1]], axis=-1), delimiter=',')
 np.savetxt(os.path.join(data_path, 's_wrong.csv'), s_wrong, delimiter=',')
@@ -183,5 +186,18 @@ for i, ((V, F), (TP, TV)) in enumerate(zip(frame_meshes, frame_vecs)):
     # save_obj(mesh_to_obj(V, F, uv_coords=m / jnp.array([jnp.pi, 2 * jnp.pi])), f"blender/unwrap_sphere/frame_{i}.obj")
     export_vec_field(TP, TV, f"blender/rewrap_sphere/frame_{i}.csv")
 
+
+# %%
+S2 = EmbeddedS2(1.0)
+num_points = 30
+e = 1e-3
+phi = np.linspace(0 + e, np.pi - e, num_points)
+theta = np.linspace(0, 2 * np.pi, num_points+1)[:-1]
+phi, theta = np.meshgrid(phi, theta, indexing="ij")
+# phi = phi.flatten()
+# theta = theta.flatten()
+m_connected_sphere = jnp.array(np.stack([phi, theta], axis=-1))
+
+save_obj(square_mesh_to_obj(S2.m_to_e(m_connected_sphere), uv_coords=m_connected_sphere / jnp.array([jnp.pi, 2 * jnp.pi]), wrap_y=True), f"blender/kernels/S2.obj")
 
 # %%
