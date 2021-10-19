@@ -46,7 +46,7 @@ def cleanup(objects=None, materials=None, modifiers=None, force=False):
                 bpy.data.objects.remove(obj, do_unlink=True)
 
 
-def set_renderer_settings(num_samples=128):
+def set_renderer_settings(num_samples=16):
     bpy.data.scenes["Scene"].render.engine = "CYCLES"
     bpy.data.scenes["Scene"].cycles.device = "GPU"
     bpy.data.scenes["Scene"].cycles.samples = num_samples
