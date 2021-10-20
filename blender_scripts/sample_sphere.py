@@ -47,10 +47,10 @@ add_texture(earth_mat, os.path.join(texture_path, "mercator_rot.png"))
 # VECTOR FIELD
 arr_obj = create_vector_arrow(color=(0, 0, 0, 1))
 vf_bm = import_vector_field(
-    os.path.join(data_dir, "kernels", f"sample_vecs.csv"), name='_sample'
+    os.path.join(data_dir, "kernels", f"mean_zero.csv"), name='_sample'
 )
 vf_bm = import_vector_field(
-    os.path.join(data_dir, "kernels", f"projected_vecs.csv"), bm=vf_bm, name="_proj"
+    os.path.join(data_dir, "kernels", f"sample_vecs.csv"), bm=vf_bm, name="_proj"
 )
 vf_obj = add_vector_field(
     vf_bm, arr_obj, scale=3, name="observations"
