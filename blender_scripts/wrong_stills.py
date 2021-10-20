@@ -22,7 +22,7 @@ with open(os.path.join(scripts_dir, "render.py")) as file:
 reset_scene()
 set_renderer_settings(num_samples=16 if bpy.app.background else 128)
 (cam_axis, cam_obj) = setup_camera(
-    distance=15.5,
+    distance=10,
     angle=(0, 0, 0),
     lens=85,
     height=1500,
@@ -34,7 +34,7 @@ setup_lighting(
     horizontal_angles=(-np.pi / 6, np.pi / 3, np.pi / 3),
     vertical_angles=(-np.pi / 3, -np.pi / 6, np.pi / 4),
 )
-set_resolution(1080, aspect=(16,9))
+set_resolution(1080/2, aspect=(16,9))
 
 bd_obj = create_backdrop(location=(0, 0, -2), scale=(10, 5, 5))
 arr_obj = create_vector_arrow(color=(1, 0, 0, 1))

@@ -8,7 +8,7 @@ scene = context.scene
 frame_path = str(sys.argv[-2])
 reverse_frames = bool(int(sys.argv[-1]))
 
-video_path = "/home/mjhutchinson/Documents/projects/ExtrinsicGaugeEquivariantVectorGPs/videos"
+video_path = "/home/mjhutchinson/Documents/projects/ExtrinsicGaugeEquivariantVectorGPs/blender_outputs"
 
 # frame_path = "/home/mjhutchinson/Documents/projects/ExtrinsicGaugeEquivariantVectorGPs/blender/blank_to_wrong/renders"
 # reverse_frames = False
