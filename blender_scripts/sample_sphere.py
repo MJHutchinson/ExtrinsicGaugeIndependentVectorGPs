@@ -14,7 +14,7 @@ data_dir = os.path.join(base_dir, "blender")
 texture_path = os.path.join(base_dir, "textures")
 col_dir = os.path.join(base_dir, "col")
 
-os.makedirs(os.path.join(data_dir, 'project_to_sphere', 'renders'), exist_ok=True)
+os.makedirs(os.path.join(data_dir, 'sample_sphere', 'renders'), exist_ok=True)
 
 with open(os.path.join(scripts_dir, "render.py")) as file:
     exec(file.read())
@@ -47,7 +47,7 @@ add_texture(earth_mat, os.path.join(texture_path, "mercator_rot.png"))
 # VECTOR FIELD
 arr_obj = create_vector_arrow(color=(0, 0, 0, 1))
 vf_bm = import_vector_field(
-    os.path.join(data_dir, "kernels", f"mean_zero.csv"), name='_sample'
+    os.path.join(data_dir, "kernels", f"zero_vecs.csv"), name='_sample'
 )
 vf_bm = import_vector_field(
     os.path.join(data_dir, "kernels", f"sample_vecs.csv"), bm=vf_bm, name="_proj"
@@ -63,7 +63,7 @@ earth_obj.parent = empty
 vf_obj.parent = empty
 
 bpy.context.scene.render.filepath = os.path.join(
-    data_dir, "project_to_sphere", "renders", 'frame_'
+    data_dir, "sample_sphere", "renders", 'frame_'
 )
 empty.rotation_euler = Euler((0,0,math.radians(90)), "XYZ")
 
