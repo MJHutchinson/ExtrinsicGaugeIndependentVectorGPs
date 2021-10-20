@@ -141,7 +141,6 @@ for i in range(len(track) - 1):
 bpy.context.scene.render.filepath = os.path.join(
     data_dir, "satellite_tracks", "renders", "frame"
 )
-set_resolution(1080)
 bpy.context.scene.frame_end = max_frame
 bpy.context.scene.frame_current = bpy.context.scene.frame_start
 bpy.ops.render.render(use_viewport=True, animation=True, write_still=True)

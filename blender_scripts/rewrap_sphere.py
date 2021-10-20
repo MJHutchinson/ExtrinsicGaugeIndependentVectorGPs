@@ -20,7 +20,7 @@ with open(os.path.join(scripts_dir, "render.py")) as file:
     exec(file.read())
 
 reset_scene()
-set_renderer_settings(num_samples=128 if bpy.app.background else 128)
+set_renderer_settings(num_samples=16 if bpy.app.background else 128)
 (cam_axis, cam_obj) = setup_camera(
     distance=15.5,
     angle=(0, 0, 0),
@@ -65,7 +65,6 @@ for frame in range(frames):
     bpy.context.scene.render.filepath = os.path.join(
         data_dir, "rewrap_sphere", "renders", f"frame_{frames - frame - 1:04d}.png"
     )
-    set_resolution(1080)
     bpy.ops.object.empty_add(type='PLAIN_AXES', align='WORLD', location=(0, 0, 0), scale=(1, 1, 1))
     empty = bpy.context.selected_objects[0]
     earth_obj.parent = empty

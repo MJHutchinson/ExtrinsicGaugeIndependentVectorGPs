@@ -20,7 +20,7 @@ with open(os.path.join(scripts_dir, "render.py")) as file:
     exec(file.read())
 
 reset_scene()
-set_renderer_settings(num_samples=128 if bpy.app.background else 128)
+set_renderer_settings(num_samples=16 if bpy.app.background else 128)
 (cam_axis, cam_obj) = setup_camera(
     distance=15.5,
     angle=(0, 0, 0),

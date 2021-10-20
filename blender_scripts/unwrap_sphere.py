@@ -40,9 +40,9 @@ bd_obj = create_backdrop(location=(0, 0, -2), scale=(10, 5, 5))
 arr_obj = create_vector_arrow(color=(1, 0, 0, 1))
 
 frames = 60
-# for frame in range(frames):
 
-for frame in [0, 29, 59]:
+# for frame in [0, 29, 59]:
+for frame in range(frames):
     print(frame)
     frame_name = f"frame_{frame}"
     bm = import_bmesh(os.path.join(data_dir, "unwrap_sphere", f"{frame_name}.obj"))

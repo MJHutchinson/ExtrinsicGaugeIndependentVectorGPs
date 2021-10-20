@@ -14,7 +14,7 @@ data_dir = os.path.join(base_dir, "blender")
 texture_path = os.path.join(base_dir, "textures")
 col_dir = os.path.join(base_dir, "col")
 
-os.makedirs(os.path.join(data_dir, 'blank_to_wrong', 'renders'), exist_ok=True)
+os.makedirs(os.path.join(data_dir, 'kernels', 'renders'), exist_ok=True)
 
 with open(os.path.join(scripts_dir, "render.py")) as file:
     exec(file.read())
@@ -71,25 +71,25 @@ vf_obj.parent = empty
 mean_obj.parent = empty
 
 bpy.context.scene.render.filepath = os.path.join(
-    data_dir, "kernels", "renders", 'wrong_front.png'
+    data_dir, "kernels", "renders", 'right_front.png'
 )
 empty.rotation_euler = Euler((0,0,math.radians(90)), "XYZ")
 bpy.ops.render.render(use_viewport=True, write_still=True)
 
 bpy.context.scene.render.filepath = os.path.join(
-    data_dir, "kernels", "renders", 'wrong_back.png'
+    data_dir, "kernels", "renders", 'right_back.png'
 )
 empty.rotation_euler = Euler((0,0,-math.radians(90)), "XYZ")
 bpy.ops.render.render(use_viewport=True, write_still=True)
 
 bpy.context.scene.render.filepath = os.path.join(
-    data_dir, "kernels", "renders", 'wrong_top.png'
+    data_dir, "kernels", "renders", 'right_top.png'
 )
 empty.rotation_euler = Euler((0,-math.radians(90),math.radians(90)), "XYZ")
 bpy.ops.render.render(use_viewport=True, write_still=True)
 
 bpy.context.scene.render.filepath = os.path.join(
-    data_dir, "kernels", "renders", 'wrong_bottom.png'
+    data_dir, "kernels", "renders", 'right_bottom.png'
 )
 empty.rotation_euler = Euler((0,math.radians(90),math.radians(90)), "XYZ")
 bpy.ops.render.render(use_viewport=True, write_still=True)
