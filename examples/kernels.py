@@ -188,6 +188,7 @@ np.savetxt(os.path.join(data_path, 'mean_wrong_sphere.csv'), jnp.concatenate([*p
 np.savetxt(os.path.join(data_path, 'mean_right_sphere.csv'), jnp.concatenate([*project(m, mean_right, sphere_m_to_3d)], axis=-1), delimiter=',')
 np.savetxt(os.path.join(data_path, 'sample_vecs.csv'), jnp.concatenate([S2.m_to_e(m), euc_vecs], axis=-1), delimiter=',')
 np.savetxt(os.path.join(data_path, 'projected_vecs.csv'), jnp.concatenate([S2.m_to_e(m), proj_vecs], axis=-1), delimiter=',')
+np.savetxt(os.path.join(data_path, 'zero_vecs.csv'), jnp.concatenate([S2.m_to_e(m), jnp.zeros_like(proj_vecs)], axis=-1), delimiter=',')
 
 # np.savetxt(os.path.join(data_path, 'mean_right_sphere.csv'), jnp.concatenate([*project(m, mean_right, sphere_m_to_3d)], axis=-1), delimiter=',')
 # np.savetxt(os.path.join(data_path, 'mean_right_flat.csv'), jnp.concatenate([project(m, mean_right, sphere_flat_m_to_3d)[0], project(m, mean_right, sphere_m_to_3d)[1]], axis=-1), delimiter=',')
