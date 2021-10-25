@@ -9,6 +9,7 @@ from riemannianvectorgp.utils.spherical_harmonics import (
     _spherical_harmonics,
     _d_n,
     _c_nd,
+    _c_n
 )
 from riemannianvectorgp.utils import projection_matrix
 from .manifold import AbstractRiemannianMainfold
@@ -23,18 +24,47 @@ class S2(AbstractRiemannianMainfold):
         self,
         radius: float = 1.0,
         max_l: int = 11,
+        # spectrum_func = None,
     ):
         self.radius = radius
         self.max_l = max_l
         self.constants = np.zeros(
             sum([_d_n(n, self.dimension) for n in range(max_l + 1)])
         )
+
         i = 0
-        for n in range(max_l + 1):
+        for n in range(self.max_l + 1):
             d_n = _d_n(n, self.dimension)
-            self.constants[i : (i + d_n)] = jnp.sqrt(_c_nd(n, self.dimension))
+            cn = _c_n(n)
+            self.constants[i : (i + d_n)] = jnp.sqrt(cn)
             i += d_n
+
         self.constants = jnp.array(self.constants)
+
+    # def compute_normalised_constants(self, spectrum_func):
+    #     self.constants = np.zeros(
+    #         sum([_d_n(n, self.dimension) for n in range(self.max_l + 1)])
+    #     )
+        
+    #     eig_vals = []
+    #     cns = []
+
+    #     i = 0
+    #     for n in range(self.max_l + 1):
+    #         d_n = _d_n(n, self.dimension)
+    #         cn = _c_n(n)
+    #         self.constants[i : (i + d_n)] = jnp.sqrt(cn)
+    #         cns.append(cn)
+    #         eig_vals.append(self.laplacian_eigenvalue(i))
+    #         i += d_n
+
+    #     eig_vals = jnp.array(eig_vals)
+
+    #     psds = spectrum_func(eig_vals)
+    #     c_nu = jnp.sum(psds * jnp.array(cns))
+    #     self.constants = self.constants # / c_nu
+
+    #     print(c_nu)
 
     @partial(jit, static_argnums=(0,))
     def laplacian_eigenvalue(
