@@ -155,6 +155,8 @@ def main(logdir, geometry, num_hours, spacetime, plot_sphere):
                                                 space_time=spacetime)
     noises_cond = jnp.ones_like(v_cond) * 1.7
 
+    import pdb; pdb.set_trace()
+
     # Set up kernel
     if geometry == 'r2':
         space_kernel = TFPKernel(tfk.MaternThreeHalves, 2, 2)
@@ -190,10 +192,19 @@ def main(logdir, geometry, num_hours, spacetime, plot_sphere):
     gp_params = gp_params._replace(kernel_params=kernel_params)
     gp_state = gp.condition(gp_params, m_cond, v_cond, noises_cond)
 
+    with open(logdir+'/model/gp.pickle', "wb") as f:
+        pickle.dump(gp, f)
+
+    with open(logdir+'/model/gp_params.pickle', "wb") as f:
+        pickle.dump(gp_params, f)
+    
+    with open(logdir+'/model/gp_state.pickle', "wb") as f:
+        pickle.dump(gp_state, f)
+
     # Plot
     spacetime_ = "spacetime" if spacetime else "space"
     sphere_or_plane = "sphere" if plot_sphere else "plane"
-    fname = "figs/"+geometry+"_gp_"+spacetime_+"_"+sphere_or_plane+".pdf"
+    fname = "figs/"+geometry+"_gp_"+spacetime_+"_"+sphere_or_plane+".png"
     fname_vid = "figs/"+geometry+"_gp_"+spacetime_+"_"+sphere_or_plane+"_video.mp4"
 
     m_cond, v_cond, prior_mean = GetDataAlongSatelliteTrack(
@@ -209,12 +220,13 @@ def main(logdir, geometry, num_hours, spacetime, plot_sphere):
                                     space_time=spacetime)
 
     posterior_mean = gp(gp_params, gp_state, m)[0].reshape(num_hours, lat_size*lon_size, 2)
-    posterior_mean = posterior_mean + prior_mean
+    posterior_mean += prior_mean
     m = m.reshape(num_hours, lat_size*lon_size, -1)
     m_cond = m_cond.reshape(num_hours, 60, -1)
     v_cond = v_cond.reshape(num_hours, 60, 2) 
     K = gp(gp_params, gp_state, m_ext)[1]
 
+    np.save("log/data_for_plots/prior_mean.npy", np.asarray(prior_mean))
     np.save("log/data_for_plots/posterior_mean.npy", np.asarray(posterior_mean))
     var_norm = jnp.diag(jnp.trace(K, axis1=2, axis2=3)).reshape(lon_size_ext, lat_size_ext)
     std_norm = jnp.sqrt(var_norm).transpose()
@@ -223,7 +235,8 @@ def main(logdir, geometry, num_hours, spacetime, plot_sphere):
     np.save("log/data_for_plots/v_cond.npy", np.asarray(v_cond))
     np.save("log/data_for_plots/test_locations.npy", np.asarray(m))
     np.save("log/data_for_plots/mesh.npy", mesh)
-    import pdb; pdb.set_trace()
+
+    #import sys; sys.exit()
 
     if spacetime:
         animate(fname_vid, posterior_mean, K, m, m_cond, v_cond, num_hours, mesh, lon_size_ext, lat_size_ext)

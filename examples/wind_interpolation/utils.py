@@ -99,9 +99,27 @@ def GetDataAlongSatelliteTrack(
     return_mean: bool=False,
     climatology: Union[np.ndarray, None]=None,
     space_time: bool=False) -> List[jnp.ndarray]:
-    """Generate wind data along the trajectories of Aeolus (satellite)
-        More information about the Aeolus satellite: https://www.n2yo.com/satellite/?s=43600
-        https://www.ecmwf.int/sites/default/files/elibrary/2016/16851-esa-adm-aeolus-doppler-wind-lidar-mission-status-and-validation-strategy.pdf
+    """Generate wind data along the trajectories of a given satellite
+
+        Args:
+            ds: an xarray dataset containing the global wind velocity data
+            satellite: the satellite used for observation
+            year: year of observation date
+            month: month of observation date
+            day: day of observation date
+            hour: initial hour of observation (e.g. 8 if observation starts at 8am)
+            num_hours: observation duration (in hours)
+            anomaly: option to output the wind speed anomaly around the climatology
+            return_mean: option to output the climatology together with the observation data
+            climatology: an optional numpy array containing the climatology data
+            space_time: option for 3D spacetime output (lat, lon, time)
+
+        Output:
+            location: an array of size (num_obs, 2) or (num_obs, 3) (the latter if space_time=True)
+                      containing the (lat, lon) or (lat, lon, time) information of the satellite track.
+            wind: an array of size (num_obs, 2) containing the (vertical, horizontal) wind speed data 
+                  along the satellite track.
+            mean: the climatology data. Only available when the return_mean flag is set to True.
     """
     date = f"{year}-{month}-{day}"
     lon = deg2rad(ds.isel(time=0).lon.values) # Range: [0, 2*pi]
@@ -115,7 +133,6 @@ def GetDataAlongSatelliteTrack(
         if climatology is None:
             climatology.weekly_climatology()
             climatology = np.load("../../datasets/climatology/weekly_climatology.npz")
-        # Compute difference from weekly climatology
         u_mean = climatology['u'][week_numbers[t]-1]
         v_mean = climatology['v'][week_numbers[t]-1]
         return u_mean, v_mean
