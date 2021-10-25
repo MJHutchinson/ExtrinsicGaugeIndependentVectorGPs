@@ -33,6 +33,6 @@ if __name__ == "__main__":
     # Load reanalysis data
     ds = xr.open_mfdataset('../../datasets/weatherbench_wind_data/*.nc')
 
-    climatology(ds)
-    monthly_climatology(ds)
+    # climatology(ds)
+    # monthly_climatology(ds)
     weekly_climatology(ds)

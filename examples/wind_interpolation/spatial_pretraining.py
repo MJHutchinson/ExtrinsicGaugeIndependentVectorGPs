@@ -124,16 +124,10 @@ def main(logdir, samples, epochs, geometry):
     log_length_scales = np.stack(log_length_scales)
     log_amplitudes = np.stack(log_amplitudes)
 
-    plt.figure()
-    plt.hist(log_length_scales)
-    plt.savefig("figs/"+geometry+"log_length_scale_distribution.png")
+    np.save(logdir+'/'+geometry+'_log_length_scale.npy', log_length_scales.mean())
 
-    plt.figure()
-    plt.hist(log_amplitudes)
-    plt.savefig("figs/"+geometry+"log_amplitude_distribution.png")
-
-    with open(logdir+'/'+geometry+'_params_pretrained.pickle', "wb") as f:
-        pickle.dump({'log_length_scale': log_length_scales, 'log_amplitude': log_amplitudes}, f)
+    # with open(logdir+'/'+geometry+'_params_pretrained.pickle', "wb") as f:
+    #     pickle.dump({'log_length_scale': log_length_scales, 'log_amplitude': log_amplitudes}, f)
 
 
 if __name__ == '__main__':
