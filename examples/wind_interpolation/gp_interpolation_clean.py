@@ -15,7 +15,6 @@ from riemannianvectorgp.kernel import (
     TFPKernel
 )
 from riemannianvectorgp.utils import GlobalRNG
-from examples.wind_interpolation.utils import deg2rad, rad2deg
 import pickle
 
 # %%
@@ -110,13 +109,11 @@ with open('log/model/gp_state_s2.pickle', "wb") as f:
 # %%
 # Prediction on test locations (Euclidean)
 posterior_mean_r2, posterior_cov_r2 = gp_r2(gp_params_r2, gp_state_r2, m)
-posterior_mean_r2 = posterior_mean_r2.reshape(lat_size*lon_size, 2)
 posterior_mean_r2 += prior_mean
 
 # %%
 # Prediction on test locations (Spherical)
 posterior_mean_s2, posterior_cov_s2 = gp_s2(gp_params_s2, gp_state_s2, m)
-posterior_mean_s2 = posterior_mean_s2.reshape(lat_size*lon_size, 2)
 posterior_mean_s2 += prior_mean
 
 # %%
