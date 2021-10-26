@@ -77,7 +77,8 @@ empty.scale = (-1,1,1)
 bpy.context.scene.render.filepath = os.path.join(
     data_dir, render_name, "renders", 'r2_sphere.png'
 )
-# bpy.ops.render.render(use_viewport=True, write_still=True)
+if bpy.app.background:
+    bpy.ops.render.render(use_viewport=True, write_still=True)
 
 cleanup(objects=[earth_obj, vf_obj, mean_obj], materials=[earth_mat], force=True)
 
@@ -123,4 +124,5 @@ empty.scale = (-1,1,1)
 bpy.context.scene.render.filepath = os.path.join(
     data_dir, render_name, "renders", 's2_sphere.png'
 )
-# bpy.ops.render.render(use_viewport=True, write_still=True)
+if bpy.app.background:
+    bpy.ops.render.render(use_viewport=True, write_still=True)

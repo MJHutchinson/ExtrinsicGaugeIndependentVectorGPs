@@ -42,8 +42,6 @@ bd_obj = create_backdrop(location=(0, 0, -1.6), scale=(10, 5, 5))
 arr_obj = create_vector_arrow(color=(0.7, 0.7, 0.7, 1))
 
 bm = import_bmesh(os.path.join(data_dir, render_name, "earth_flat.obj"))
-# bm = import_bmesh(os.path.join(data_dir, "kernels", "s2.obj"))
-# import_color(bm, name='white', color = (1,1,1,1))
 import_color(bm, data_file = os.path.join(data_dir, render_name, "s_s2.csv"), palette_file = os.path.join(col_dir, "viridis.csv"))
 earth_obj = add_mesh(bm, name="Earth")
 earth_mat = add_vertex_colors(earth_obj)
@@ -71,9 +69,6 @@ grey_arr_obj = create_vector_arrow(color=(0,0,0, 1.0)) # (0.0, 0.75, 1.0, 1)
 mean_bm = import_vector_field(
     os.path.join(data_dir, render_name, f"mean_s2_flat.csv")
 )
-# mean_bm = import_vector_field(
-#     os.path.join(data_dir, render_name, f"mean_full_s2_flat.csv")
-# )
 mean_obj = add_vector_field(
     mean_bm, grey_arr_obj, scale=scale, name="means"
 )
@@ -89,21 +84,18 @@ line_obj2.parent = empty
 set_object_collections(backdrop = [bd_obj], object=[earth_obj, vf_obj, mean_obj, line_obj,line_obj2] , instancing = [grey_arr_obj, arr_obj])
 
 
-# bpy.context.scene.render.filepath = os.path.join(
-#     data_dir, render_name, "renders", 's2_flat.png'
-# )
+empty.rotation_euler = Euler((0,math.radians(180),math.radians(90)), "XYZ")
+
 bpy.context.scene.render.filepath = os.path.join(
     data_dir, render_name, "renders", 's2_flat.png'
 )
-empty.rotation_euler = Euler((0,math.radians(180),math.radians(90)), "XYZ")
-# bpy.ops.render.render(use_viewport=True, write_still=True)
+if bpy.app.background:
+    bpy.ops.render.render(use_viewport=True, write_still=True)
 
 cleanup(objects=[earth_obj, vf_obj, mean_obj], materials=[earth_mat], force=True)
 
 bm = import_bmesh(os.path.join(data_dir, render_name, "earth_flat.obj"))
-# bm = import_bmesh(os.path.join(data_dir, "kernels", "s2.obj"))
-# import_color(bm, name='white', color = (1,1,1,1))
-import_color(bm, data_file = os.path.join(data_dir, render_name, "s_s2.csv"), palette_file = os.path.join(col_dir, "viridis.csv"))
+import_color(bm, data_file = os.path.join(data_dir, render_name, "s_r2.csv"), palette_file = os.path.join(col_dir, "viridis.csv"))
 earth_obj = add_mesh(bm, name="Earth")
 earth_mat = add_vertex_colors(earth_obj)
 add_texture(earth_mat, os.path.join(texture_path, "mercator_rot_shift.png"))
@@ -114,9 +106,6 @@ scale = 0.002
 vf_bm = import_vector_field(
     os.path.join(data_dir, render_name, f"tracks_flat.csv")
 )
-# vf_bm = import_vector_field(
-#     os.path.join(data_dir, render_name, f"tracks_full_flat.csv")
-# )
 vf_obj = add_vector_field(
     vf_bm, arr_obj, scale=scale, name="observations"
 )
@@ -125,9 +114,6 @@ grey_arr_obj = create_vector_arrow(color=(0,0,0, 1.0)) # (0.0, 0.75, 1.0, 1)
 mean_bm = import_vector_field(
     os.path.join(data_dir, render_name, f"mean_r2_flat.csv")
 )
-# mean_bm = import_vector_field(
-#     os.path.join(data_dir, render_name, f"mean_full_s2_flat.csv")
-# )
 mean_obj = add_vector_field(
     mean_bm, grey_arr_obj, scale=scale, name="means"
 )
@@ -142,11 +128,10 @@ line_obj2.parent = empty
 
 set_object_collections( object=[earth_obj, vf_obj, mean_obj])
 
+empty.rotation_euler = Euler((0,math.radians(180),math.radians(90)), "XYZ")
 
-# bpy.context.scene.render.filepath = os.path.join(
-#     data_dir, render_name, "renders", 's2_flat.png'
-# )
 bpy.context.scene.render.filepath = os.path.join(
     data_dir, render_name, "renders", 'r2_flat.png'
 )
-empty.rotation_euler = Euler((0,math.radians(180),math.radians(90)), "XYZ")
+if bpy.app.background:
+    bpy.ops.render.render(use_viewport=True, write_still=True)
