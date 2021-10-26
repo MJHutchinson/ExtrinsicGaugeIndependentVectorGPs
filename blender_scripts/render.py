@@ -9,6 +9,8 @@ from mathutils import Vector
 def reset_scene():
     for obj in bpy.data.objects:
         bpy.data.objects.remove(obj, do_unlink=True)
+    for curve in bpy.data.curves:
+        bpy.data.curves.remove(curve, do_unlink=True)
     for mesh in bpy.data.meshes:
         bpy.data.meshes.remove(mesh, do_unlink=True)
     for material in bpy.data.materials:
@@ -95,6 +97,33 @@ def import_bmesh(mesh_file):
 
     return bm
 
+def import_curve(coordinate_file, name='Curve'):
+    coordinates = np.genfromtxt(coordinate_file, delimiter=",")
+
+    curve = bpy.data.curves.new(name, type='CURVE')
+    curve.dimensions = '3D'
+    # curveData.resolution_u = 2
+
+    spline = curve.splines.new(type='NURBS')
+    spline.points.add(len(coordinates)-1)
+    spline.use_endpoint_u = True
+
+    for point, coord in zip(spline.points, coordinates):
+        point.co = (*coord, 1.0)  
+
+    obj = bpy.data.objects.new(name, curve)
+    bpy.context.collection.objects.link(obj)   
+
+    curve.bevel_depth = 0.01      
+    curve.use_fill_caps = True
+
+    return obj
+
+
+def add_line_color(obj, color=(1,0,0,1)):
+    mat = bpy.data.materials.new(name="Surface Color")
+    obj.data.materials.append(mat)
+    mat.diffuse_color = color
 
 def import_color(bm, name='color', data_file=None, palette_file=None, color=None, bounds=None):
     if color is None:
@@ -138,37 +167,6 @@ def add_mesh(bm, name="Mesh"):
 
     return obj
 
-
-def add_base_color(
-    obj,
-    color=(
-        1,
-        1,
-        1,
-        1,
-    ),
-    shade_smooth=True,
-):
-    mat = bpy.data.materials.new(name="Surface Color")
-    mat.use_nodes = True
-
-    color_node = mat.node_tree.nodes.new("ShaderNodeRGB")
-    color_node.outputs[0].default_value = color
-    shader_node = mat.node_tree.nodes["Principled BSDF"]
-
-    mat.node_tree.links.new(
-        color_node.outputs["Color"], shader_node.inputs["Base Color"]
-    )
-    # mat.node_tree.links.new(color_node.outputs["Alpha"], shader_node.inputs["Alpha"])
-
-    obj.data.materials.clear()
-    obj.data.materials.append(mat)
-
-    if shade_smooth:
-        obj.data.polygons.foreach_set("use_smooth", [True] * len(obj.data.polygons))
-        obj.data.update()
-
-    return mat
 
 
 def add_vertex_colors(obj, shade_smooth=True):
@@ -464,6 +462,22 @@ def create_dot(location=(0, 0, 0), radius=1, color=(0, 0, 0, 1)):
     obj.data.update()
     obj.location = location
 
+    return obj
+
+def create_elliptical_torus(line_thickness = 0.25, vertical_thickness = 1):
+    bpy.ops.mesh.primitive_torus_add(major_segments = 256, minor_segments = 64, minor_radius = line_thickness)
+    obj = bpy.data.objects["Torus"]
+    obj.rotation_euler = (np.pi/2, 0, 0)
+    obj.scale = (1,1,vertical_thickness)
+    
+    bpy.ops.object.select_all(action="DESELECT")
+    obj.select_set(True)
+    bpy.context.view_layer.objects.active = obj
+    bpy.ops.object.transform_apply(rotation = True, scale = True)
+    
+    obj.data.materials.clear()
+    obj.data.materials.append(bpy.data.materials["Black Surface"])
+    
     return obj
 
 
@@ -999,3 +1013,13 @@ def add_texture(mat, texture_file_path):
     mat.node_tree.links.new(color_node.outputs["Color"], mix_node.inputs["Color1"])
     mat.node_tree.links.new(texture_node.outputs["Color"], mix_node.inputs["Color2"])
     mat.node_tree.links.new(mix_node.outputs["Color"], shader_node.inputs["Base Color"])
+
+
+def get_context(context_type='VIEW_3D'):
+    for area in bpy.context.screen.areas:
+        if area.type == context_type:
+            context = bpy.context.copy()
+            context['area'] = area
+            break
+
+    return context
