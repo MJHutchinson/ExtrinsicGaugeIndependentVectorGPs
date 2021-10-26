@@ -4,12 +4,12 @@ To reproduce the global wind interpolation results in the paper, simpy run
 ```
 python gp_interpolation_clean.py
 ```
-(maybe better to change the filename to gp_wind_interpolation.py or something and remember to add the necessary data to the log folder).
+(maybe better to change the filename to `gp_wind_interpolation.py` or something and remember to add the necessary data to the log folder. Also add script to generate the observation data.).
 
-In order to perform the experiment from scratch with different parameter settings, then follow the instructions below:
+In order to perform the experiment from scratch with different parameter settings and dates, follow the instructions below:
 
 ## 1. Installing additional dependencies
-To run the experiments, you need to first install the package in `requirements_experiments.py`. Additionally you will need to install `xesmf`, which is more tricky to install. The recomended method is via conda.
+To run the experiments, you need to first install the package in `requirements_experiments.txt`. Additionally you will need to install `xesmf`, which is more tricky to install. The recomended method is via conda.
 
 ```
 conda install -c conda-forge xesmf
@@ -17,11 +17,11 @@ conda install -c conda-forge xesmf
 
 ## 2. Downloading the data
 The code to download the data are saved in `../../datasets`. Go there and run the following scripts
-- Run `python era5.py` to download the ERA5 wind reanalysis data (this may take up to an hour depending on the queue)
-- Run `python wind_dataset.py` to download the weatherbench historical wind data
+- Run `python era5.py` to download the ERA5 wind reanalysis data (this may take up to an hour depending on the queue). You can change the date(s) of the wind reanalysis data to be retrieved in the script. The default is `2019-01-01`.
+- Run `python wind_dataset.py` to download the weatherbench historical wind data. You can select the resolution of the wind data to be downloaded using the flag `--resolution`. The options are `1, 2` or `5` for 1.40625&deg, 2.8125&deg and 5.625&deg resolutions respectively.
 
 ## 3. Running the experiment
-The main script to run the wind interpolation experiment in the paper is `gp_interpolation.py`. However before running this, you have to first compute the weekly historical average of the wind velocity field by running the script `climatology.py`, and then run `spatial_pretraining.py` to learn the length scale from the weatherbench data. In the latter, you have the option to specify the geometry of the base manifold by including the flag `-g`. So if you want to use a Euclidean kernel (which is the default), run
+The main script to run the wind interpolation experiment in the paper is `gp_interpolation_clean.py` (reminder to change filename). However before running this, you have to first compute the weekly historical average of the wind velocity field by running the script `climatology.py`, and then run `spatial_pretraining.py` to learn the length scale from the weatherbench data. In the latter, you have the option to specify the geometry of the base manifold by including the flag `-g`. So if you want to use a Euclidean kernel (which is the default), run
 ```
 python spatial_pretraining.py -g r2
 ```
@@ -30,16 +30,4 @@ and if you want to use a spherical kernel, run
 python spatial_pretraining.py -g s2
 ```
 
-However, pretraining may take several hours to complete (this can be accelerated by using the GPU however, it still takes a few hours) so if you want to avoid this, you can set the (log) length scale manually by adding the flag `-l` and the desired value for the log length scale in the `gp_interpolation.py` script. A sensible value for the log length scale is -1.65.
-
-The `-g` flag to specify the underlying geometry is also available in `gp_interpolation.py` as well as a `--plot-sphere/--no-plot-sphere` flag which plots the results on a sphere and the lat/lon map respectively.
-
-Examples:
-1. The code below fits the GP with log length scale -1.625 using the spherical Matern kernel and plots the result on a lat/lon map
-```
-python gp_interpolation.py -l -1.65 -g s2 --no-plot-sphere
-```
-2. The following fits a GP with pretrained log length scale using the Euclidean Matern kernel and plots the result on a sphere
-```
-python gp_interpolation.py -l -1.65 -g r2 --plot-sphere
-```
+However, pretraining may take several hours to complete (this can be accelerated by using the GPU however, it still may take a few hours) so if you want to avoid this, you can set the (log) length scale manually in the script `gp_interpolation_clean.py`.
