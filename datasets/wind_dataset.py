@@ -5,7 +5,7 @@ from zipfile import ZipFile
 
 @click.command()
 @click.option("--target-dir", default = "weatherbench_wind_data", type=str, help="directory to save data")
-@click.option("--resolution", default = 5, type=click.Choice([1, 2, 5]), help="resolution of wind data (choose from 1, 2 or 5)")
+@click.option("--resolution", default = 5, type=int, help="resolution of wind data (choose from 1, 2 or 5)")
 def get_winddata(target_dir, resolution):
     """
     This function downloads the weatherbench regridded ERA5 global wind data from 1979-2018
