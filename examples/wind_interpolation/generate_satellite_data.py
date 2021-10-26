@@ -77,7 +77,7 @@ m_cond, v_cond = GetDataAlongSatelliteTrack(ds,
 
 # %%
 # Save data
-import pdb; pdb.set_trace()
 np.save("log/m_cond.npy", np.asarray(m_cond))
 np.save("log/v_cond.npy", np.asarray(v_cond))
 np.save("log/m.npy", np.asarray(m))
+
