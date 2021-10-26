@@ -138,9 +138,9 @@ def pendulum_statespace_kernel_2(rng, r_lengthscale=1, s1_lengthscale=0.3):
 
 
 def pendulum_statespace_euclidean_kernel(rng, r_lengthscale=1.0, s1_lengthscale=1.0):
-    k = TFPKernel(tfk.SquaredExponential, 2, 2)
+    k = TFPKernel(tfk.ExponentiatedQuadratic, 2, 2)
     k_params = k.init_params(next(rng))
-    k_params = k_params._replace(log_length_scales=jnp.log(s1_lengthscale))
+    k_params = k_params._replace(log_length_scale=jnp.log(s1_lengthscale))
 
     kernel = ScaledKernel(k)
     scaled_kernel_params = kernel.init_params(next(rng))
