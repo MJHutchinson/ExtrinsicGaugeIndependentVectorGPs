@@ -26,7 +26,7 @@ setup_compositor(mask_center = (0.5,0.3125), mask_size = (0.675,0.325), shadow_c
 (cam_axis, cam_obj) = setup_camera(distance = 9.125, angle = (-np.pi/16, 0, 0), lens = 85, height = 2560, crop = (1/5,9/10,0,10/11))
 setup_lighting(shifts = (-10,-10,10), sizes = (9,18,15), energies = (1500,150,1125),
                horizontal_angles = (-np.pi/6, np.pi/3, np.pi/3), vertical_angles = (-np.pi/3, -np.pi/6, np.pi/4))
-set_resolution(1080)
+set_resolution(640)
 
 bd_obj = create_backdrop(location=(0, 0, -0.75), scale=(10, 5, 5))
 arr_obj = create_vector_arrow(color=(0, 0, 0, 1))
