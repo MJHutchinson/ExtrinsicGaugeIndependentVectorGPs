@@ -464,7 +464,7 @@ def create_dot(location=(0, 0, 0), radius=1, color=(0, 0, 0, 1)):
 
     return obj
 
-def create_elliptical_torus(line_thickness = 0.25, vertical_thickness = 1):
+def create_elliptical_torus(line_thickness = 0.25, vertical_thickness = 1, color=(0,0,0,0)):
     bpy.ops.mesh.primitive_torus_add(major_segments = 256, minor_segments = 64, minor_radius = line_thickness)
     obj = bpy.data.objects["Torus"]
     obj.rotation_euler = (np.pi/2, 0, 0)
@@ -475,8 +475,11 @@ def create_elliptical_torus(line_thickness = 0.25, vertical_thickness = 1):
     bpy.context.view_layer.objects.active = obj
     bpy.ops.object.transform_apply(rotation = True, scale = True)
     
+    mat = bpy.data.materials.new(name="Black Surface")
+    mat.use_nodes = True
+    mat.node_tree.nodes["Principled BSDF"].inputs["Base Color"].default_value = color
     obj.data.materials.clear()
-    obj.data.materials.append(bpy.data.materials["Black Surface"])
+    obj.data.materials.append(mat)
     
     return obj
 
@@ -947,7 +950,7 @@ def setup_lighting(
     return lights
 
 
-def create_poisson_disk_samples(obj):
+def create_poisson_disk_samples(obj, distance_min=0.1):
     vert_bm = bmesh.new()
     vert_bm.verts.new((0, 0, 0))
     vert_mesh = bpy.data.meshes.new("Single Vertex")
@@ -960,7 +963,7 @@ def create_poisson_disk_samples(obj):
     output_node = mod.node_group.nodes["Group Output"]
     point_distribute_node = mod.node_group.nodes.new("GeometryNodePointDistribute")
     point_distribute_node.distribute_method = "POISSON"
-    point_distribute_node.inputs["Distance Min"].default_value = 0.1
+    point_distribute_node.inputs["Distance Min"].default_value = distance_min
     point_distribute_node.inputs["Density Max"].default_value = 100000
     point_instance_node = mod.node_group.nodes.new("GeometryNodePointInstance")
     point_instance_node.inputs[1].default_value = vert_obj

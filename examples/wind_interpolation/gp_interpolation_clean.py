@@ -1,4 +1,6 @@
 # %%
+import os
+
 import xarray as xr
 import numpy as np
 import jax.numpy as jnp
@@ -17,14 +19,22 @@ from riemannianvectorgp.kernel import (
 from riemannianvectorgp.utils import GlobalRNG
 import pickle
 
+from riemannianvectorgp.utils import (
+    sphere_m_to_3d,
+    sphere_flat_m_to_3d,
+    GlobalRNG,
+    save_obj,
+    mesh_to_polyscope,
+    mesh_to_obj,
+    square_mesh_to_obj,
+    flatten,
+    project
+)
+data_path = "/home/mhutchin/Documents/projects/ExtrinsicGaugeEquivariantVectorGPs/blender/wind_plots"
+
 # %%
 rng1 = GlobalRNG()
 rng2 = GlobalRNG()
-
-year = 2019
-month = 1
-day = 1
-hour = 9
 
 lat_size = 32
 lon_size = 64
@@ -46,7 +56,7 @@ bottom_line[:, :, 0] = np.pi - 1e-4
 m_sphere = np.concatenate((top_line, m_sphere, bottom_line), axis=1)    
 m_sphere = m_sphere.reshape((-1, 2))
 
-m_poisson = np.genfromtxt("/home/mhutchin/Documents/projects/ExtrinsicGaugeEquivariantVectorGPs/blender/kernels/poisson_sample.csv", delimiter = ',')
+m_poisson = np.genfromtxt("/home/mhutchin/Documents/projects/ExtrinsicGaugeEquivariantVectorGPs/blender/kernels/poisson_sample_2.csv", delimiter = ',')
 m_poisson = EmbeddedS2().e_to_m(m_poisson)
 m_poisson = np.mod(m_poisson, np.array([np.pi, 2*np.pi]))
 # prior_mean = prior_mean.reshape((64,32, -1))
@@ -71,10 +81,10 @@ gp_s2 = GaussianProcess(kernel_s2)
 
 # %%
 # Set length scale and amplitudes
-log_length_scale_r2 = -1.63
-log_length_scale_s2 = -1.63
-log_amplitude_r2 = 2.2
-log_amplitude_s2 = 11.5
+log_length_scale_r2 = -1.4076507
+log_length_scale_s2 = -1.522926
+log_amplitude_r2 = 1.6
+log_amplitude_s2 = 9.7
 
 # Refresh r2 kernel
 kernel_params_r2 = kernel_r2.init_params(rng1)
@@ -125,32 +135,56 @@ with open('log/model/gp_state_s2.pickle', "wb") as f:
 
 # %%
 # Prediction on test locations (Euclidean)
-posterior_mean_r2, _ = gp_r2(gp_params_r2, gp_state_r2, m_poisson)
+posterior_mean_r2, var_r2 = gp_r2(gp_params_r2, gp_state_r2, m_poisson)
 _, posterior_cov_r2 = gp_r2(gp_params_r2, gp_state_r2, m_sphere)
 # posterior_mean_r2 += prior_mean
 
 # %%
+var_r2 = jnp.diagonal(var_r2).T
+var_L_r2 = jnp.linalg.cholesky(var_r2)
+
+var_L_x_sphere = project(m_poisson, var_L_r2[:,0,:], sphere_m_to_3d)[1]
+var_L_z_sphere = project(m_poisson, -var_L_r2[:,1,:], sphere_m_to_3d)[1]
+var_normal_sphere = np.cross(var_L_x_sphere, var_L_z_sphere)
+var_unit_normal_extrinsic = var_normal_sphere / np.expand_dims(np.linalg.norm(var_normal_sphere, axis=-1),axis=-1)
+var_cc_sphere = np.concatenate([sphere_m_to_3d(m_poisson), var_unit_normal_extrinsic, var_L_x_sphere, var_L_z_sphere], axis=-1)
+np.savetxt(os.path.join(data_path, 'covariance_r2.csv'), var_cc_sphere, delimiter=',')
+
+var_L_x_flat = project(m_poisson, var_L_r2[:,0,:], sphere_flat_m_to_3d)[1]
+var_L_z_flat = project(m_poisson, -var_L_r2[:,1,:], sphere_flat_m_to_3d)[1]
+var_normal_flat = np.cross(var_L_x_flat, var_L_z_flat)
+var_unit_normal_extrinsic = var_normal_flat / np.expand_dims(np.linalg.norm(var_normal_flat, axis=-1),axis=-1)
+var_cc_sphere = np.concatenate([sphere_flat_m_to_3d(m_poisson), var_unit_normal_extrinsic, var_L_x_flat, var_L_z_flat], axis=-1)
+np.savetxt(os.path.join(data_path, 'covariance_r2_flat.csv'), var_cc_sphere, delimiter=',')
+
+
+# %%
 # Prediction on test locations (Spherical)
-posterior_mean_s2, _ = gp_s2(gp_params_s2, gp_state_s2, m_poisson)
+posterior_mean_s2, var_s2 = gp_s2(gp_params_s2, gp_state_s2, m_poisson)
 _, posterior_cov_s2 = gp_s2(gp_params_s2, gp_state_s2, m_sphere)
 # posterior_mean_s2 += prior_mean
+var_s2 = jnp.diagonal(var_s2).T
+var_L_s2 = jnp.linalg.cholesky(var_s2)
 
 # %%
-import os
-from riemannianvectorgp.utils import (
-    sphere_m_to_3d,
-    sphere_flat_m_to_3d,
-    GlobalRNG,
-    save_obj,
-    mesh_to_polyscope,
-    mesh_to_obj,
-    square_mesh_to_obj,
-    flatten,
-    project
-)
+
+var_L_x_sphere = project(m_poisson, var_L_s2[:,0,:], sphere_m_to_3d)[1]
+var_L_z_sphere = project(m_poisson, -var_L_s2[:,1,:], sphere_m_to_3d)[1]
+var_normal_sphere = np.cross(var_L_x_sphere, var_L_z_sphere)
+var_unit_normal_extrinsic = var_normal_sphere / np.expand_dims(np.linalg.norm(var_normal_sphere, axis=-1),axis=-1)
+var_cc_sphere = np.concatenate([sphere_m_to_3d(m_poisson), var_unit_normal_extrinsic, var_L_x_sphere, var_L_z_sphere], axis=-1)
+np.savetxt(os.path.join(data_path, 'covariance_s2.csv'), var_cc_sphere, delimiter=',')
+
+var_L_x_flat = project(m_poisson, var_L_s2[:,0,:], sphere_flat_m_to_3d)[1]
+var_L_z_flat = project(m_poisson, -var_L_s2[:,1,:], sphere_flat_m_to_3d)[1]
+var_normal_flat = np.cross(var_L_x_flat, var_L_z_flat)
+var_unit_normal_extrinsic = var_normal_flat / np.expand_dims(np.linalg.norm(var_normal_flat, axis=-1),axis=-1)
+var_cc_sphere = np.concatenate([sphere_flat_m_to_3d(m_poisson), var_unit_normal_extrinsic, var_L_x_flat, var_L_z_flat], axis=-1)
+np.savetxt(os.path.join(data_path, 'covariance_s2_flat.csv'), var_cc_sphere, delimiter=',')
+
+
 
 # %%
-data_path = "/home/mhutchin/Documents/projects/ExtrinsicGaugeEquivariantVectorGPs/blender/wind_plots"
 np.savetxt(os.path.join(data_path, 'mean_r2.csv'), jnp.concatenate([*project(m_poisson, posterior_mean_r2, sphere_m_to_3d)], axis=-1), delimiter=',')
 np.savetxt(os.path.join(data_path, 'mean_s2.csv'), jnp.concatenate([*project(m_poisson, posterior_mean_s2, sphere_m_to_3d)], axis=-1), delimiter=',')
 np.savetxt(os.path.join(data_path, 'tracks.csv'), jnp.concatenate([*project(m_cond, v_cond_anomaly, sphere_m_to_3d)], axis=-1), delimiter=',')
@@ -158,15 +192,6 @@ np.savetxt(os.path.join(data_path, 'tracks.csv'), jnp.concatenate([*project(m_co
 np.savetxt(os.path.join(data_path, 'mean_r2_flat.csv'), jnp.concatenate([*project(m_poisson, posterior_mean_r2, sphere_flat_m_to_3d)], axis=-1), delimiter=',')
 np.savetxt(os.path.join(data_path, 'mean_s2_flat.csv'), jnp.concatenate([*project(m_poisson, posterior_mean_s2, sphere_flat_m_to_3d)], axis=-1), delimiter=',')
 np.savetxt(os.path.join(data_path, 'tracks_flat.csv'), jnp.concatenate([*project(m_cond, v_cond_anomaly, sphere_flat_m_to_3d)], axis=-1), delimiter=',')
-
-# np.savetxt(os.path.join(data_path, 'mean_full_r2.csv'), jnp.concatenate([*project(m_poisson, posterior_mean_r2 + prior_mean, sphere_m_to_3d)], axis=-1), delimiter=',')
-# np.savetxt(os.path.join(data_path, 'mean_full_s2.csv'), jnp.concatenate([*project(m_poisson, posterior_mean_s2 + prior_mean, sphere_m_to_3d)], axis=-1), delimiter=',')
-# np.savetxt(os.path.join(data_path, 'tracks_full.csv'), jnp.concatenate([*project(m_cond, v_cond_full, sphere_m_to_3d)], axis=-1), delimiter=',')
-
-# np.savetxt(os.path.join(data_path, 'mean_full_r2_flat.csv'), jnp.concatenate([*project(m_poisson, posterior_mean_r2 + prior_mean, sphere_flat_m_to_3d)], axis=-1), delimiter=',')
-# np.savetxt(os.path.join(data_path, 'mean_full_s2_flat.csv'), jnp.concatenate([*project(m_poisson, posterior_mean_s2 + prior_mean, sphere_flat_m_to_3d)], axis=-1), delimiter=',')
-# np.savetxt(os.path.join(data_path, 'tracks_full_flat.csv'), jnp.concatenate([*project(m_cond, v_cond_full, sphere_flat_m_to_3d)], axis=-1), delimiter=',')
-
 
 np.savetxt(os.path.join(data_path, 's_r2.csv'), np.diag(np.trace(posterior_cov_r2, axis1=2, axis2=3)), delimiter=',')
 np.savetxt(os.path.join(data_path, 's_s2.csv'), np.diag(np.trace(posterior_cov_s2, axis1=2, axis2=3)), delimiter=',')

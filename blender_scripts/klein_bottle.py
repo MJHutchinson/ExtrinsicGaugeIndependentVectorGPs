@@ -22,8 +22,8 @@ with open(os.path.join(scripts_dir, "render.py")) as file:
 reset_scene()
 set_renderer_settings(num_samples = 2048 if bpy.app.background else 128)
 setup_layers()
-setup_compositor(mask_center = (0.5,0.3125), mask_size = (0.675,0.325), shadow_color_correction_exponent = 2.75)
-(cam_axis, cam_obj) = setup_camera(distance = 9.125, angle = (-np.pi/16, 0, 0), lens = 85, height = 2560, crop = (1/5,9/10,0,10/11))
+setup_compositor(mask_center = (0.5,0.3125), mask_size = (0.9,0.325), shadow_color_correction_exponent = 2.75)
+(cam_axis, cam_obj) = setup_camera(distance = 9.125, angle = (-np.pi/16, 0, 0), lens = 85, height = 2560, crop = (1/5,9/10,1/10,9.5/11))
 setup_lighting(shifts = (-10,-10,10), sizes = (9,18,15), energies = (1500,150,1125),
                horizontal_angles = (-np.pi/6, np.pi/3, np.pi/3), vertical_angles = (-np.pi/3, -np.pi/6, np.pi/4))
 set_resolution(640)
@@ -42,7 +42,7 @@ vf_bm = import_vector_field(
     os.path.join(data_dir, "klein_bottle", f"sample_vecs.csv")
 )
 vf_obj = add_vector_field(
-    vf_bm, arr_obj, scale=1.5, name="sample"
+    vf_bm, arr_obj, scale=3, name="sample"
 )
 
 set_object_collections(object = [klein_obj, vf_obj])
