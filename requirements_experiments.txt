@@ -5,3 +5,5 @@ xarray
 skyfield
 dask
 cdsapi
+pickle
+click
