@@ -36,11 +36,6 @@ data_path = "/home/mhutchin/Documents/projects/ExtrinsicGaugeEquivariantVectorGP
 rng1 = GlobalRNG()
 rng2 = GlobalRNG()
 
-year = 2019
-month = 1
-day = 1
-hour = 9
-
 lat_size = 32
 lon_size = 64
 
