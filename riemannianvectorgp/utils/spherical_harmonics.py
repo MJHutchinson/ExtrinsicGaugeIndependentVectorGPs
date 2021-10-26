@@ -1,16 +1,21 @@
 import math
 import numpy as np
 import jax.numpy as jnp
-from scipy.special import gamma, gegenbauer
+from scipy.special import gamma, loggamma, gegenbauer, eval_legendre
 
 from jax import jit
 from functools import partial
 
 def _d_n(n, d):
-    return int((2*n + d - 1) * gamma(n+d-1) / (gamma(d)*gamma(n+1)))
+    return int((2*n + d - 1) * jnp.exp(loggamma(n+d-1) - loggamma(d) - loggamma(n+1)))
 
 def _c_nd(n, d):
     return (_d_n(n, d) * gamma((d+1)/2)) / ((2*np.pi)**((d+1)/2) * gegenbauer(n, (d-1)/2)(1))
+
+
+def _c_n(n):
+    d_n = (2*n + 1)  # Gammas cancel out
+    return d_n * 2 / (np.sqrt(2) * np.pi * eval_legendre(n, 1))
 
 
 @partial(jit, static_argnums=(0,))

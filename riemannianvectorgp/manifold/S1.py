@@ -50,7 +50,7 @@ class EmbeddedS1(AbstractEmbeddedRiemannianManifold, S1):
 
     def __init__(
         self,
-        radius: float,
+        radius: float = 1.0,
     ):
         super().__init__(radius)
 
