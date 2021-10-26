@@ -22,13 +22,13 @@ with open(os.path.join(scripts_dir, "render.py")) as file:
 reset_scene()
 set_renderer_settings(num_samples = 2048 if bpy.app.background else 128)
 setup_layers()
-setup_compositor(mask_center = (0.5,0.3125), mask_size = (0.675,0.325), shadow_color_correction_exponent = 2.75)
-(cam_axis, cam_obj) = setup_camera(distance = 9.125, angle = (-np.pi/16, 0, 0), lens = 85, height = 2560, crop = (1/5,9/10,0,10/11))
-setup_lighting(shifts = (-10,-10,10), sizes = (9,18,15), energies = (1500,150,1125),
-               horizontal_angles = (-np.pi/6, np.pi/3, np.pi/3), vertical_angles = (-np.pi/3, -np.pi/6, np.pi/4))
+setup_compositor(mask_center = (0.5,0.425), mask_size = (0.925,0.4), shadow_color_correction_exponent = 2.75)
+cam_obj = setup_camera(offset = (0,0,-0.25), distance = 24.75, angle = (-5*np.pi/36, 0, 0), lens = 85, height = 430, crop = (1/12,1,1/12,5/6))
+setup_lighting(shifts = (-15,-15,15), sizes = (15,24,9), energies = (3000,625,1000), 
+               horizontal_angles = (-np.pi/4, np.pi/3, np.pi/4), vertical_angles = (-np.pi/3, -np.pi/4, np.pi/4))
 set_resolution(640)
 
-bd_obj = create_backdrop(location=(0, 0, -0.25), scale=(10, 5, 5))
+bd_obj = create_backdrop(location=(0, 0, -1), scale=(10, 5, 5))
 arr_obj = create_vector_arrow(color=(0, 0, 0, 1))
 
 set_object_collections(backdrop = [bd_obj], instancing = [arr_obj])
@@ -47,26 +47,14 @@ vf_obj = add_vector_field(
 
 set_object_collections(object = [obj, vf_obj])
 
-bpy.ops.object.select_all(action='DESELECT')
-obj.select_set(True)
-bpy.ops.object.origin_set(type='ORIGIN_CENTER_OF_MASS', center='MEDIAN')
-
 bpy.ops.object.empty_add(type='PLAIN_AXES', align='WORLD', location=obj.location, scale=(1, 1, 1))
 empty = bpy.context.selected_objects[0]
-
-bpy.ops.object.select_all(action='DESELECT')
-obj.select_set(True)
-empty.select_set(True)
-bpy.ops.object.parent_set(type='OBJECT', keep_transform=False)
-
-bpy.ops.object.select_all(action='DESELECT')
-vf_obj.select_set(True)
-empty.select_set(True)
-bpy.ops.object.parent_set(type='OBJECT', keep_transform=False)
+obj.parent = empty
+vf_obj.parent = empty
 
 empty.rotation_euler = Euler((math.radians(0),math.radians(0),math.radians(0)), "XYZ")
 empty.location = (0,0,0)
-# empty.scale = (0.5, 0.5, 0.5)
+empty.scale = (4,4,4)
 
 bpy.context.scene.render.filepath = os.path.join(
     data_dir, "torus", "renders", 'torus.png'

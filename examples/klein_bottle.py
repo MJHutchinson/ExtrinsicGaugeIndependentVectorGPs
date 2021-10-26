@@ -10,11 +10,16 @@ from riemannianvectorgp.utils import (
     klein_bottle_m_to_3d,
     klein_fig8_m_to_3d,
     klein_fig8_double_m_to_3d,
-    GlobalRNG
+    GlobalRNG,
+    save_obj,
+    mesh_to_obj,
+    flatten,
+    project
 )
 from riemannianvectorgp.utils import GlobalRNG, mesh_to_polyscope
 
 rng = GlobalRNG((0))
+import os
 
 # %%
 import polyscope as ps
@@ -90,37 +95,59 @@ tangent_vec = jnp.stack(
     ],
     axis=-2,
 )
+m_3d = np.genfromtxt("/home/mhutchin/Documents/projects/ExtrinsicGaugeEquivariantVectorGPs/blender/klein_bottle/poisson.csv", delimiter = ',')
+point_cloud = ps.register_point_cloud('poisson', m_3d)
 tangent_vec = tangent_vec / jnp.linalg.norm(tangent_vec, axis=-2)[..., np.newaxis, :]
 klein_mesh.set_vertex_tangent_basisX(tangent_vec[..., 0])
+
 # %%
+n = 100
+m = jnp.stack([jnp.array([i/n * jnp.pi, j/n *2*jnp.pi]) * jnp.ones((m_3d.shape[0], 2)) for i in range(n) for j in range(n)], axis=0)
+inds = jnp.argmin(((m_3d - klein_bottle_m_to_3d(m)) ** 2).sum(axis=-1), axis=0)
+m = m[inds, jnp.arange(inds.shape[0])]
 
-from riemannianvectorgp.manifold import EmbeddedKleinBottle
+def loss(m):
+    return jnp.mean((m_3d - klein_bottle_m_to_3d(m)) ** 2)
 
-KB = EmbeddedKleinBottle()
-kb_eigs = KB.laplacian_eigenfunction(jnp.arange(100), m)
+
+import optax
+
+optim = optax.adam(1)
+params = {'m': m}
+opt_state = optim.init(params)
 
 for i in range(100):
-    klein_mesh.add_scalar_quantity(f'eigfunc {i}', kb_eigs[:, i, 0])
+    grads = jax.grad(lambda params: loss(params['m']))(params)
+    updates, opt_state = optim.update(grads, opt_state)
+    params = optax.apply_updates(params, updates)
+    print(f'{i}: {loss(params["m"])=}')
+
+
+optim = optax.adam(1e-2)
+params = {'m': m}
+opt_state = optim.init(params)
+
+for i in range(100):
+    grads = jax.grad(lambda params: loss(params['m']))(params)
+    updates, opt_state = optim.update(grads, opt_state)
+    params = optax.apply_updates(params, updates)
+    print(f'{i}: {loss(params["m"])=}')
+
+
 # %%
+m = params['m']
+np.savetxt("/home/mhutchin/Documents/projects/ExtrinsicGaugeEquivariantVectorGPs/blender/klein_bottle/poisson_intrinsic.csv", m, delimiter = ',')
+m = np.genfromtxt("/home/mhutchin/Documents/projects/ExtrinsicGaugeEquivariantVectorGPs/blender/klein_bottle/poisson_intrinsic.csv", delimiter = ',')
+m_cloud = ps.register_point_cloud('m', klein_bottle_m_to_3d(m))
+
+# %%
+from riemannianvectorgp.manifold import EmbeddedKleinBottle
 from riemannianvectorgp.kernel import MaternCompactRiemannianManifoldKernel
-
-kernel = MaternCompactRiemannianManifoldKernel(1.5, KB, 100)
-kernel_parmas = kernel.init_params(next(rng))
-kernel_parmas = kernel_parmas._replace(log_length_scale=jnp.array(-2))
-k = kernel.matrix(kernel_parmas, m, m)
-klein_mesh.add_scalar_quantity(f'kernel', k[450 + 10 - 5*30, :, 0, 0])
-
-# %%
 from riemannianvectorgp.kernel import ManifoldProjectionVectorKernel
-
-kernel = ManifoldProjectionVectorKernel(MaternCompactRiemannianManifoldKernel(1.5, KB, 100), KB)
-kernel_parmas = kernel.init_params(next(rng))
-k = kernel.matrix(kernel_parmas, m, m)
-klein_mesh.add_intrinsic_vector_quantity('vec_kernel', k[450 + 10 - 5*30, :, :, :] @ jnp.array([1, 0]))
-# %%
 from riemannianvectorgp.sparse_gp import SparseGaussianProcess
 
 s = 5
+KB = EmbeddedKleinBottle()
 kernel = ManifoldProjectionVectorKernel(MaternCompactRiemannianManifoldKernel(1.5, KB, 100), KB)
 gp = SparseGaussianProcess(kernel, 1, 100, s)
 (params, state) = gp.init_params_with_state(next(rng))
@@ -129,9 +156,19 @@ params = params._replace(
 )
 state = gp.randomize(params, state, next(rng))
 
-samples = gp.prior(params.kernel_params, state.prior_state, m)
 
-for i in range(s):
-    klein_mesh.add_intrinsic_vector_quantity(f'sample {i}', samples[i])
+# %%
+samples = gp.prior(params.kernel_params, state.prior_state, m)[3]
+m_cloud.add_vector_quantity('sample', project(m, samples, klein_bottle_m_to_3d)[1])
+data_path = "/home/mhutchin/Documents/projects/ExtrinsicGaugeEquivariantVectorGPs/blender/klein_bottle"
+np.savetxt(os.path.join(data_path, 'sample_vecs.csv'), jnp.concatenate([*project(m, samples, klein_bottle_m_to_3d)], axis=-1), delimiter=',')
 
+# %%
+
+save_obj(mesh_to_obj(*mesh_to_polyscope(
+        klein_bottle_m_to_3d(m).reshape((num_points, num_points, 3)),
+        wrap_x=False,
+        wrap_y=True,
+        reverse_x=False,
+    ), uv_coords=(m / jnp.array([jnp.pi, 2 * jnp.pi])) - jnp.array([0.5172414, 0])), f"blender/klein_bottle/klein_bottle.obj")
 # %%
