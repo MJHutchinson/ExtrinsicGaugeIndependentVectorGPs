@@ -16,9 +16,9 @@ conda install -c conda-forge xesmf
 ```
 
 ## 2. Downloading the data
-The code to download the data are saved in `../../datasets`. Go there and run the following scripts
+The code to download the data are saved in `../../datasets`.
 - Run `python era5.py` to download the ERA5 wind reanalysis data (this may take up to an hour depending on the queue). You can change the date(s) of the wind reanalysis data to be retrieved in the script. The default is `2019-01-01`.
-- Run `python wind_dataset.py` to download the weatherbench historical wind data. You can select the resolution of the wind data to be downloaded using the flag `--resolution`. The options are `1, 2` or `5` for 1.40625&deg, 2.8125&deg and 5.625&deg resolutions respectively.
+- Run `python wind_dataset.py` to download the weatherbench historical wind data. You can select the resolution of the wind data to be downloaded using the flag `--resolution`. The options are `1, 2` or `5` for 1.40625°, 2.8125° and 5.625° resolutions respectively.
 
 ## 3. Running the experiment
 The main script to run the wind interpolation experiment in the paper is `gp_interpolation_clean.py` (reminder to change filename). However before running this, you have to first compute the weekly historical average of the wind velocity field by running the script `climatology.py`, and then run `spatial_pretraining.py` to learn the length scale from the weatherbench data. In the latter, you have the option to specify the geometry of the base manifold by including the flag `-g`. So if you want to use a Euclidean kernel (which is the default), run
