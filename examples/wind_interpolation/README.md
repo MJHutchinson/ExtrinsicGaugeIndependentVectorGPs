@@ -4,16 +4,15 @@ To reproduce the global wind interpolation results in the paper, simpy run
 ```
 python gp_interpolation_clean.py
 ```
-(remember to change the filename back to gp_interpolation and add the necessary data to the log folder).
+(maybe better to change the filename to gp_wind_interpolation.py or something and remember to add the necessary data to the log folder).
 
-In order to perform the experiment from scratch with different settings, then follow the instructions below:
+In order to perform the experiment from scratch with different parameter settings, then follow the instructions below:
 
-## 1. Installing dependencies
-To run the experiments, you need to first install the package in `requirements_experiments.py`. Additionally you will need to install `xesmf` and `cartopy`. These are more tricky to install. The reccomended method is via conda.
+## 1. Installing additional dependencies
+To run the experiments, you need to first install the package in `requirements_experiments.py`. Additionally you will need to install `xesmf`, which is more tricky to install. The recomended method is via conda.
 
 ```
 conda install -c conda-forge xesmf
-conda install -c conda-forge cartopy
 ```
 
 ## 2. Downloading the data
