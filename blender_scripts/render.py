@@ -464,7 +464,7 @@ def create_dot(location=(0, 0, 0), radius=1, color=(0, 0, 0, 1)):
 
     return obj
 
-def create_elliptical_torus(line_thickness = 0.25, vertical_thickness = 1):
+def create_elliptical_torus(line_thickness = 0.25, vertical_thickness = 1, color=(0,0,0,0)):
     bpy.ops.mesh.primitive_torus_add(major_segments = 256, minor_segments = 64, minor_radius = line_thickness)
     obj = bpy.data.objects["Torus"]
     obj.rotation_euler = (np.pi/2, 0, 0)
@@ -475,8 +475,11 @@ def create_elliptical_torus(line_thickness = 0.25, vertical_thickness = 1):
     bpy.context.view_layer.objects.active = obj
     bpy.ops.object.transform_apply(rotation = True, scale = True)
     
+    mat = bpy.data.materials.new(name="Black Surface")
+    mat.use_nodes = True
+    mat.node_tree.nodes["Principled BSDF"].inputs["Base Color"].default_value = color
     obj.data.materials.clear()
-    obj.data.materials.append(bpy.data.materials["Black Surface"])
+    obj.data.materials.append(mat)
     
     return obj
 
