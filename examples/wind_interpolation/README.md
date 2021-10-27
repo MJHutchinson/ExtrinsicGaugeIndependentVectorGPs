@@ -35,7 +35,7 @@ and if you want to use a spherical kernel, run
 python spatial_pretraining.py -g s2
 ```
 
-Note that learning the lengthscale may take several hours to complete on GPU under the default settings. If you want faster results, you can reduce the number of training epochs and number of samples via the flags `-e` and `-s` respectively. The default is 800 and 150 resepectively. Example:
+Note that computing the lengthscale may take several hours to complete on GPU under the default settings. If you want faster results, you can reduce the number of training epochs and number of samples via the flags `-e` and `-s` respectively. The default is 800 and 150 resepectively. Example:
 ```
 python spatial_pretraining.py -g s2 -e 400 -s 20
 ```
