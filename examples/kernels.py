@@ -149,14 +149,22 @@ params = params._replace(
 )
 # with jax.disable_jit():
 state = gp.condition(params, track_points, track_vecs, jnp.ones_like(track_vecs) * 1e-6)
-mean_right, _ = gp(params, state, m)
+mean_right, K_m = gp(params, state, m)
 _, K = gp(params, state, m_sphere)
 s_right = jnp.linalg.det(K[jnp.arange(K.shape[0]), jnp.arange(K.shape[0])])
 
 # sphere_mesh.add_intrinsic_vector_quantity('mean_right', mean_right)
 # sphere_mesh.add_scalar_quantity('variance_right', s_right)
-point_cloud.add_vector_quantity('mean_right', project(m, mean_right, sphere_flat_m_to_3d)[1])
-sphere_mesh.add_scalar_quantity('variance_right', s_right)
+# point_cloud.add_vector_quantity('mean_right', project(m, mean_right, sphere_flat_m_to_3d)[1])
+# sphere_mesh.add_scalar_quantity('variance_right', s_right)
+# %%
+data_path = "/home/mhutchin/Documents/projects/ExtrinsicGaugeEquivariantVectorGPs/blender/kernels"
+eig_vals, eig_vecs = jnp.linalg.eig(K_m[jnp.arange(K_m.shape[0]), jnp.arange(K_m.shape[0])])
+eig_vals = jnp.real(eig_vals)
+normals_x = eig_vals[:, 0:1] * eig_vecs[..., 0]
+normals_z = eig_vals[:, 1:2] * eig_vecs[..., 1]
+np.savetxt(os.path.join(data_path, 'mean_right_normals.csv'), jnp.real(jnp.concatenate([*project(m, mean_right, sphere_m_to_3d), project(m, normals_x, sphere_m_to_3d)[1], project(m, normals_z, sphere_m_to_3d)[1]], axis=-1)), delimiter=',')
+
 
 # %%
 from riemannianvectorgp.sparse_gp import SparseGaussianProcess

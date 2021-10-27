@@ -11,8 +11,8 @@ from mathutils import Euler
 base_dir = os.path.expanduser("~/Documents/projects/ExtrinsicGaugeEquivariantVectorGPs/")
 scripts_dir = os.path.join(base_dir, "blender_scripts")
 data_dir = os.path.join(base_dir, "blender")
-texture_path = os.path.join(base_dir, "textures")
-col_dir = os.path.join(base_dir, "col")
+texture_path = os.path.join(base_dir, "blender","textures")
+col_dir = os.path.join(base_dir, "blender", "col")
 
 os.makedirs(os.path.join(data_dir, 'project_to_sphere', 'renders'), exist_ok=True)
 

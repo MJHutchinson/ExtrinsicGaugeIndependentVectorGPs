@@ -1,9 +1,9 @@
 matplotlib
 jupyter
-netcdf4
-xarray
-skyfield
 dask
 cdsapi
 pickle
 click
+xarray
+skyfield
+netcdf4
