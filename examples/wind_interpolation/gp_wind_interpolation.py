@@ -17,7 +17,7 @@ from riemannianvectorgp.kernel import (
     ScaledKernel,
     TFPKernel,
 )
-from riemannianvectorgp.utils import GlobalRNG
+from riemannianvectorgp.utils import GlobalRNG, refresh_kernel
 import pickle
 
 from riemannianvectorgp.utils import (
@@ -89,22 +89,10 @@ log_amplitude_r2 = 1.6 # np.load("log/r2_log_amplitude.npy")
 log_amplitude_s2 = 9.7 # np.load("log/s2_log_amplitude.npy")
 
 # Refresh r2 kernel
-kernel_params_r2 = kernel_r2.init_params(rng1)
-sub_kernel_params_r2 = kernel_params_r2.sub_kernel_params
-sub_kernel_params_r2 = sub_kernel_params_r2._replace(
-    log_length_scale=log_length_scale_r2
-)
-kernel_params_r2 = kernel_params_r2._replace(sub_kernel_params=sub_kernel_params_r2)
-kernel_params_r2 = kernel_params_r2._replace(log_amplitude=log_amplitude_r2)
+kernel_params_r2 = refresh_kernel(rng1, kernel_r2, m, log_length_scale_r2, log_amplitude_r2)
 
 # Refresh s2 kernel
-kernel_params_s2 = kernel_s2.init_params(rng2)
-sub_kernel_params_s2 = kernel_params_s2.sub_kernel_params
-sub_kernel_params_s2 = sub_kernel_params_s2._replace(
-    log_length_scale=log_length_scale_s2
-)
-kernel_params_s2 = kernel_params_s2._replace(sub_kernel_params=sub_kernel_params_s2)
-kernel_params_s2 = kernel_params_s2._replace(log_amplitude=log_amplitude_s2)
+kernel_params_s2 = refresh_kernel(rng2, kernel_s2, m, log_length_scale_s2, log_amplitude_s2)
 
 # Initialize GPs
 gp_params_r2, gp_state_r2 = gp_r2.init_params_with_state(next(rng1))
