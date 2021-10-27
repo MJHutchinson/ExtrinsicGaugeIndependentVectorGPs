@@ -117,6 +117,9 @@ gp_params_s2 = gp_params_s2._replace(kernel_params=kernel_params_s2)
 # Fit and save Euclidean GP
 gp_state_r2 = gp_r2.condition(gp_params_r2, m_cond, v_cond, noises_cond)
 
+if not os.path.exists("log/model"):
+    os.mkdir("log/model")
+
 with open("log/model/gp_r2.pickle", "wb") as f:
     pickle.dump(gp_r2, f)
 
