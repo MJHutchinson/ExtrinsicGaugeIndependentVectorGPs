@@ -47,63 +47,6 @@ def refresh_kernel(
     return kernel_params
 
 
-class Hyperprior:
-    def __init__(self):
-        self.amplitude = None
-        self.length_scale = None
-
-    @dataclass
-    class mean_and_std:
-        mean: float
-        std: float
-
-    def set_amplitude_prior(self, mean, std):
-        self.amplitude = self.mean_and_std(mean, std)
-
-    def set_length_scale_prior(self, mean, std):
-        self.length_scale = self.mean_and_std(mean, std)
-
-
-class SparseGaussianProcessWithHyperprior(SparseGaussianProcess):
-    def __init__(
-        self,
-        kernel: AbstractKernel,
-        num_inducing: int,
-        num_basis: int,
-        num_samples: int,
-        hyperprior: Hyperprior,
-        geometry: str,
-    ):
-        super().__init__(kernel, num_inducing, num_basis, num_samples)
-        if geometry != "r2" and geometry != "s2":
-            raise ValueError("geometry must be either 'r2' or 's2'.")
-        self._hyperprior = hyperprior
-        self._geometry = geometry
-
-    @partial(jax.jit, static_argnums=(0,))
-    def hyperprior(
-        self,
-        params: SparseGaussianProcessParameters,
-        state: SparseGaussianProcessState,
-    ) -> jnp.ndarray:
-        """Returns the log hyperprior regularization term of the GP."""
-        # Amplitude regularizer
-        amp_mean = self._hyperprior.amplitude.mean
-        amp_std = self._hyperprior.amplitude.std
-        amp_reg = (params.kernel_params.log_amplitude - amp_mean) ** 2 / (
-            2 * amp_std ** 2
-        )
-        # Length scale regularizer
-        scale_mean = self._hyperprior.length_scale.mean
-        scale_std = self._hyperprior.length_scale.std
-        if self._geometry == "r2":
-            log_length_scale = params.kernel_params.sub_kernel_params.log_length_scale
-        elif self._geometry == "s2":
-            log_length_scale = params.kernel_params.sub_kernel_params.log_length_scale
-        scale_reg = (log_length_scale - scale_mean) ** 2 / (2 * scale_std ** 2)
-        return amp_reg + scale_reg
-
-
 def GetDataAlongSatelliteTrack(
     ds: xr.Dataset,
     satellite: EarthSatellite,
