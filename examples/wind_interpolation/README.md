@@ -18,7 +18,7 @@ conda install -c conda-forge xesmf
 ## 2. Downloading the data
 The code to download the wind data are saved in `../../datasets`.
 - Run `python era5.py` to download the ERA5 wind reanalysis data (this may take up to an hour depending on the queue). You can change the date(s) of the wind reanalysis data to be retrieved in the script. The default is `2019-01-01`.
-- Run `python wind_dataset.py` to download the weatherbench historical wind data. You can select the resolution of the wind data to be downloaded using the flag `--resolution`. The options are `1, 2` or `5` for 1.40625°, 2.8125° and 5.625° resolutions respectively (default is `5`).
+- Run `python wind_dataset.py` to download the weatherbench historical wind data. You can select the resolution of the wind data via the flag `--resolution`. The options are `1, 2` or `5` for 1.40625°, 2.8125° and 5.625° resolutions respectively (default is `5`).
 
 ## 3. Generating satellite observations and learning the length scale
 You will need to run the following scripts in order:
