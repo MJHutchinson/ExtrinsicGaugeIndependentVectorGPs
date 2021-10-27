@@ -110,7 +110,7 @@ def main(logdir, samples, epochs, geometry):
         # Initialise parameters and state
         params, state = sparse_gp.init_params_with_state(next(rng))
         kernel_params = refresh_kernel(
-            next(rng), kernel, m_cond, geometry, init_log_length_scale
+            next(rng), kernel, m_cond, init_log_length_scale
         )
 
         params = params._replace(kernel_params=kernel_params)
