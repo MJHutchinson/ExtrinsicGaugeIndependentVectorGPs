@@ -133,5 +133,8 @@ dmypy.json
 .vscode
 
 datasets
-blender
+# blender
 *.blend*
+*.png
+*.pickle
+*.pdf

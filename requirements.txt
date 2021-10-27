@@ -1,6 +1,5 @@
-jax==0.2.11
-jaxlib==0.1.*
-tensorflow==2.*
-tensorflow_probability==0.12.*
-optax==0.*
+jax
+jaxlib
+tfp-nightly[jax]
+optax
 einops

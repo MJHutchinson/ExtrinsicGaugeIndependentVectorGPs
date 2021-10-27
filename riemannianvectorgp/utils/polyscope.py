@@ -128,7 +128,7 @@ def cylinder_projection_matrix_to_3d(M):
     )
 
 
-def t2_m_to_3d(M, R=3, r=1):
+def t2_m_to_3d(M, R=0.7, r=0.25):
     theta1, theta2 = jnp.take(M, 0, -1), jnp.take(M, 1, -1)
     s1 = jnp.sin(theta1)
     c1 = jnp.cos(theta1)
@@ -283,6 +283,12 @@ def project(M, V, embedding):
     Y = (proj_mat @ V[..., np.newaxis])[..., 0]
 
     return X, Y
+
+
+def flatten(M, Y, embedding):
+    proj_mat = projection_matrix(M, embedding)
+    Y = (proj_mat @ jnp.swapaxes(proj_mat, -1, -2) @ Y[..., np.newaxis])[..., 0]
+    return Y
 
 
 def import_obj(file):

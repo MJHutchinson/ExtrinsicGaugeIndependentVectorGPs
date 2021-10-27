@@ -97,35 +97,39 @@ def import_bmesh(mesh_file):
 
     return bm
 
-def import_curve(coordinate_file, name='Curve'):
+
+def import_curve(coordinate_file, name="Curve"):
     coordinates = np.genfromtxt(coordinate_file, delimiter=",")
 
-    curve = bpy.data.curves.new(name, type='CURVE')
-    curve.dimensions = '3D'
+    curve = bpy.data.curves.new(name, type="CURVE")
+    curve.dimensions = "3D"
     # curveData.resolution_u = 2
 
-    spline = curve.splines.new(type='NURBS')
-    spline.points.add(len(coordinates)-1)
+    spline = curve.splines.new(type="NURBS")
+    spline.points.add(len(coordinates) - 1)
     spline.use_endpoint_u = True
 
     for point, coord in zip(spline.points, coordinates):
-        point.co = (*coord, 1.0)  
+        point.co = (*coord, 1.0)
 
     obj = bpy.data.objects.new(name, curve)
-    bpy.context.collection.objects.link(obj)   
+    bpy.context.collection.objects.link(obj)
 
-    curve.bevel_depth = 0.01      
+    curve.bevel_depth = 0.01
     curve.use_fill_caps = True
 
     return obj
 
 
-def add_line_color(obj, color=(1,0,0,1)):
+def add_line_color(obj, color=(1, 0, 0, 1)):
     mat = bpy.data.materials.new(name="Surface Color")
     obj.data.materials.append(mat)
     mat.diffuse_color = color
 
-def import_color(bm, name='color', data_file=None, palette_file=None, color=None, bounds=None):
+
+def import_color(
+    bm, name="color", data_file=None, palette_file=None, color=None, bounds=None
+):
     if color is None:
         data = np.genfromtxt(data_file, delimiter=",")
         if bounds is None:
@@ -166,7 +170,6 @@ def add_mesh(bm, name="Mesh"):
     bm.to_mesh(mesh)
 
     return obj
-
 
 
 def add_vertex_colors(obj, shade_smooth=True):
@@ -224,7 +227,7 @@ def add_vertex_colors(obj, shade_smooth=True):
     return mat
 
 
-def import_vector_field(vf_file, bm=None, name = ""):
+def import_vector_field(vf_file, bm=None, name=""):
     vector_field = np.genfromtxt(vf_file, delimiter=",")
     if len(vector_field.shape) == 1:
         vector_field = vector_field[np.newaxis, :]
@@ -358,19 +361,17 @@ def add_vector_field(vec_bm, arr_obj, scale=1, name="Vector Field"):
 def mix_geometry_attributes(obj, attributes, suffix_1, suffix_2):
     mod = obj.modifiers[0]
     input_node = mod.node_group.nodes["Group Input"]
-    prev_node = mod.node_group.nodes['Attribute Vector Math']
+    prev_node = mod.node_group.nodes["Attribute Vector Math"]
 
-    fraction_node = mod.node_group.nodes.new('ShaderNodeValue')
+    fraction_node = mod.node_group.nodes.new("ShaderNodeValue")
 
     for attr in attributes:
-        mix_node = mod.node_group.nodes.new('GeometryNodeAttributeMix')
-        mix_node.inputs['A'].default_value = attr + suffix_1
-        mix_node.inputs['B'].default_value = attr + suffix_2
-        mix_node.inputs['Result'].default_value = attr
+        mix_node = mod.node_group.nodes.new("GeometryNodeAttributeMix")
+        mix_node.inputs["A"].default_value = attr + suffix_1
+        mix_node.inputs["B"].default_value = attr + suffix_2
+        mix_node.inputs["Result"].default_value = attr
 
-        mod.node_group.links.new(
-            fraction_node.outputs["Value"], mix_node.inputs[2]
-        )
+        mod.node_group.links.new(fraction_node.outputs["Value"], mix_node.inputs[2])
         mod.node_group.links.new(
             input_node.outputs["Geometry"], mix_node.inputs["Geometry"]
         )
@@ -381,7 +382,6 @@ def mix_geometry_attributes(obj, attributes, suffix_1, suffix_2):
         prev_node = mix_node
 
     return fraction_node
-
 
 
 def create_vector_arrow(
@@ -464,23 +464,28 @@ def create_dot(location=(0, 0, 0), radius=1, color=(0, 0, 0, 1)):
 
     return obj
 
-def create_elliptical_torus(line_thickness = 0.25, vertical_thickness = 1, color=(0,0,0,0)):
-    bpy.ops.mesh.primitive_torus_add(major_segments = 256, minor_segments = 64, minor_radius = line_thickness)
+
+def create_elliptical_torus(
+    line_thickness=0.25, vertical_thickness=1, color=(0, 0, 0, 0)
+):
+    bpy.ops.mesh.primitive_torus_add(
+        major_segments=256, minor_segments=64, minor_radius=line_thickness
+    )
     obj = bpy.data.objects["Torus"]
-    obj.rotation_euler = (np.pi/2, 0, 0)
-    obj.scale = (1,1,vertical_thickness)
-    
+    obj.rotation_euler = (np.pi / 2, 0, 0)
+    obj.scale = (1, 1, vertical_thickness)
+
     bpy.ops.object.select_all(action="DESELECT")
     obj.select_set(True)
     bpy.context.view_layer.objects.active = obj
-    bpy.ops.object.transform_apply(rotation = True, scale = True)
-    
+    bpy.ops.object.transform_apply(rotation=True, scale=True)
+
     mat = bpy.data.materials.new(name="Black Surface")
     mat.use_nodes = True
     mat.node_tree.nodes["Principled BSDF"].inputs["Base Color"].default_value = color
     obj.data.materials.clear()
     obj.data.materials.append(mat)
-    
+
     return obj
 
 
@@ -998,11 +1003,11 @@ def export_poisson_disk_samples(obj, file_name):
 def add_texture(mat, texture_file_path):
     shader_node = mat.node_tree.nodes["Principled BSDF"]
 
-    if 'Mix' in mat.node_tree.nodes.keys():
+    if "Mix" in mat.node_tree.nodes.keys():
         color_node = mat.node_tree.nodes["Mix"]
-    elif 'Vertex Color' in mat.node_tree.nodes.keys():
+    elif "Vertex Color" in mat.node_tree.nodes.keys():
         color_node = mat.node_tree.nodes["Vertex Color"]
-    elif 'RGB' in mat.node_tree.nodes.keys():
+    elif "RGB" in mat.node_tree.nodes.keys():
         color_node = mat.node_tree.nodes["RGB"]
     else:
         raise ValueError()
@@ -1018,11 +1023,11 @@ def add_texture(mat, texture_file_path):
     mat.node_tree.links.new(mix_node.outputs["Color"], shader_node.inputs["Base Color"])
 
 
-def get_context(context_type='VIEW_3D'):
+def get_context(context_type="VIEW_3D"):
     for area in bpy.context.screen.areas:
         if area.type == context_type:
             context = bpy.context.copy()
-            context['area'] = area
+            context["area"] = area
             break
 
     return context

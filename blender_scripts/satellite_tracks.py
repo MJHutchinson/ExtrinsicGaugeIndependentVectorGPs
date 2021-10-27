@@ -8,13 +8,15 @@ from mathutils import Vector
 from mathutils import Euler
 
 # directory = os.getcwd()
-base_dir = os.path.expanduser("~/Documents/projects/ExtrinsicGaugeEquivariantVectorGPs/")
+base_dir = os.path.expanduser(
+    "~/Documents/projects/ExtrinsicGaugeEquivariantVectorGPs/"
+)
 scripts_dir = os.path.join(base_dir, "blender_scripts")
 data_dir = os.path.join(base_dir, "blender")
-texture_path = os.path.join(base_dir, "textures")
-col_dir = os.path.join(base_dir, "col")
+texture_path = os.path.join(base_dir, "blender", "textures")
+col_dir = os.path.join(base_dir, "blender", "col")
 
-os.makedirs(os.path.join(data_dir, 'blank_to_wrong', 'renders'), exist_ok=True)
+os.makedirs(os.path.join(data_dir, "blank_to_wrong", "renders"), exist_ok=True)
 
 with open(os.path.join(scripts_dir, "render.py")) as file:
     exec(file.read())
@@ -34,13 +36,13 @@ setup_lighting(
     horizontal_angles=(-np.pi / 6, np.pi / 3, np.pi / 3),
     vertical_angles=(-np.pi / 3, -np.pi / 6, np.pi / 4),
 )
-set_resolution(1080, aspect=(16,9))
+set_resolution(1080, aspect=(16, 9))
 
 bd_obj = create_backdrop(location=(0, 0, -2), scale=(10, 5, 5))
 arr_obj = create_vector_arrow(color=(1, 0, 0, 1))
 
 bm = import_bmesh(os.path.join(data_dir, "unwrap_sphere", "frame_0.obj"))
-import_color(bm, color = (0.8,1,1,1))
+import_color(bm, color=(0.8, 1, 1, 1))
 earth_obj = add_mesh(bm, name="Earth")
 earth_mat = add_vertex_colors(earth_obj)
 add_texture(earth_mat, os.path.join(texture_path, "mercator_rot.png"))
@@ -103,13 +105,15 @@ for i in range(len(track)):
     vf_obj.scale = (0, 0, 0)
     track_objs.append(vf_obj)
 
-bpy.ops.object.empty_add(type='PLAIN_AXES', align='WORLD', location=(0, 0, 0), scale=(1, 1, 1))
+bpy.ops.object.empty_add(
+    type="PLAIN_AXES", align="WORLD", location=(0, 0, 0), scale=(1, 1, 1)
+)
 empty = bpy.context.selected_objects[0]
 earth_obj.parent = empty
-for obj in track_objs: 
+for obj in track_objs:
     obj.parent = empty
 
-empty.rotation_euler = Euler((0,0,math.radians(90)), "XYZ")
+empty.rotation_euler = Euler((0, 0, math.radians(90)), "XYZ")
 
 # set_object_collections(object=[earth_obj, satellite_obj, *track_objs])
 

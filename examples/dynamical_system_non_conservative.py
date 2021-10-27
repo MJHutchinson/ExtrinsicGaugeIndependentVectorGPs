@@ -321,3 +321,5 @@ plt.xlabel("Step")
 plt.ylabel("Position")
 plt.ylim([0, 2 * np.pi])
 plt.savefig("../figures/dynamics_euclidean_rollouts.pdf", bbox_inches="tight")
+
+# %%
