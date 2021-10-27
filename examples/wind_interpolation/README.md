@@ -21,7 +21,7 @@ The code to download the wind data are saved in `../../datasets`.
 - Run `python wind_dataset.py` to download the weatherbench historical wind data. You can select the resolution of the wind data via the flag `--resolution`. The options are `1, 2` or `5` for 1.40625°, 2.8125° and 5.625° resolutions respectively (default is `5`).
 
 ## 3. Generating satellite observations and learning the length scale
-You will need to run the following scripts in order:
+You will need to run the following scripts in any order:
 - `generate_satellite_data.py` to generate the satellite observations from the ERA5 data, used to fit the GP.
 - `spatial_pretraining.py` to learn the length scale from the weatherbench historic wind field data.
 Here, you have the option to specify the geometry of the base manifold by including the flag `-g`. So if you want to use a Euclidean kernel (which is the default), run
