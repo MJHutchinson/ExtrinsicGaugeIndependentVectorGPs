@@ -2,10 +2,8 @@
 import xarray as xr
 import numpy as np
 import jax.numpy as jnp
-from examples.wind_interpolation.utils import deg2rad, rad2deg, GetDataAlongSatelliteTrack
+from examples.wind_interpolation.utils import deg2rad, GetDataAlongSatelliteTrack
 from skyfield.api import load, EarthSatellite
-import click
-import pickle
 import xesmf as xe
 import os
 

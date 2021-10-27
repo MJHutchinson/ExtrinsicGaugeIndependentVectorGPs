@@ -26,8 +26,6 @@ from riemannianvectorgp.utils import (
     save_obj,
     mesh_to_polyscope,
     mesh_to_obj,
-    square_mesh_to_obj,
-    flatten,
     project
 )
 data_path = "/home/mhutchin/Documents/projects/ExtrinsicGaugeEquivariantVectorGPs/blender/wind_plots"
@@ -41,11 +39,9 @@ lon_size = 64
 
 # %%
 # Load data
-prior_mean = np.load("log/data_for_plots/prior_mean.npy") # Climatological data
-m_cond = np.load("log/data_for_plots/m_cond.npy") # Conditioning locations
-v_cond_anomaly = np.load("log/data_for_plots/v_cond.npy") # Conditioning values 1 (offset from climatological mean)
-v_cond_full = np.load("log/data_for_plots/v_cond_full.npy") # Conditioning values 2 (full velocity without subtracting mean)
-m = np.load("log/data_for_plots/m.npy") # Test locations
+m_cond = np.load("log/m_cond.npy") # Conditioning locations
+v_cond = np.load("log/v_cond.npy") # Conditioning values
+m = np.load("log/m.npy") # Test locations
 
 m_sphere = m.reshape((64,32, -1))
 m_sphere = np.concatenate((m_sphere, m_sphere[0, :, :][np.newaxis, :,  :] + np.array([0, 2 * np.pi])), axis=0)
@@ -59,11 +55,8 @@ m_sphere = m_sphere.reshape((-1, 2))
 m_poisson = np.genfromtxt("/home/mhutchin/Documents/projects/ExtrinsicGaugeEquivariantVectorGPs/blender/kernels/poisson_sample_2.csv", delimiter = ',')
 m_poisson = EmbeddedS2().e_to_m(m_poisson)
 m_poisson = np.mod(m_poisson, np.array([np.pi, 2*np.pi]))
-# prior_mean = prior_mean.reshape((64,32, -1))
-# prior_mean = np.concatenate((prior_mean, prior_mean[0, :, :][np.newaxis, :,  :]), axis=0)
-# prior_mean = prior_mean.reshape((-1, 2))
 
-noises_cond = jnp.ones_like(v_cond_anomaly) * 1.7 
+noises_cond = jnp.ones_like(v_cond) * 1.7 
 
 # %%
 # Setup Euclidean GP
@@ -81,10 +74,10 @@ gp_s2 = GaussianProcess(kernel_s2)
 
 # %%
 # Set length scale and amplitudes
-log_length_scale_r2 = -1.4076507
-log_length_scale_s2 = -1.522926
-log_amplitude_r2 = 1.6
-log_amplitude_s2 = 9.7
+log_length_scale_r2 = np.load("log/r2_log_length_scale.npy") # -1.4076507
+log_length_scale_s2 = np.load("log/s2_log_length_scale.npy") #-1.522926
+log_amplitude_r2 = 1.6 # np.load("log/r2_log_amplitude.npy")
+log_amplitude_s2 = 9.7 # np.load("log/s2_log_amplitude.npy")
 
 # Refresh r2 kernel
 kernel_params_r2 = kernel_r2.init_params(rng1)
@@ -109,7 +102,7 @@ gp_params_s2 = gp_params_s2._replace(kernel_params=kernel_params_s2)
 
 # %%
 # Fit and save Euclidean GP
-gp_state_r2 = gp_r2.condition(gp_params_r2, m_cond, v_cond_anomaly, noises_cond)
+gp_state_r2 = gp_r2.condition(gp_params_r2, m_cond, v_cond, noises_cond)
 
 with open('log/model/gp_r2.pickle', "wb") as f:
         pickle.dump(gp_r2, f)
@@ -122,7 +115,7 @@ with open('log/model/gp_state_s2.pickle', "wb") as f:
 
 # %%
 # Fit and save Spherical GP
-gp_state_s2 = gp_s2.condition(gp_params_s2, m_cond, v_cond_anomaly, noises_cond)
+gp_state_s2 = gp_s2.condition(gp_params_s2, m_cond, v_cond, noises_cond)
 
 with open('log/model/gp_s2.pickle', "wb") as f:
         pickle.dump(gp_s2, f)
@@ -137,7 +130,6 @@ with open('log/model/gp_state_s2.pickle', "wb") as f:
 # Prediction on test locations (Euclidean)
 posterior_mean_r2, var_r2 = gp_r2(gp_params_r2, gp_state_r2, m_poisson)
 _, posterior_cov_r2 = gp_r2(gp_params_r2, gp_state_r2, m_sphere)
-# posterior_mean_r2 += prior_mean
 
 # %%
 var_r2 = jnp.diagonal(var_r2).T
@@ -162,7 +154,6 @@ np.savetxt(os.path.join(data_path, 'covariance_r2_flat.csv'), var_cc_sphere, del
 # Prediction on test locations (Spherical)
 posterior_mean_s2, var_s2 = gp_s2(gp_params_s2, gp_state_s2, m_poisson)
 _, posterior_cov_s2 = gp_s2(gp_params_s2, gp_state_s2, m_sphere)
-# posterior_mean_s2 += prior_mean
 var_s2 = jnp.diagonal(var_s2).T
 var_L_s2 = jnp.linalg.cholesky(var_s2)
 
@@ -187,11 +178,11 @@ np.savetxt(os.path.join(data_path, 'covariance_s2_flat.csv'), var_cc_sphere, del
 # %%
 np.savetxt(os.path.join(data_path, 'mean_r2.csv'), jnp.concatenate([*project(m_poisson, posterior_mean_r2, sphere_m_to_3d)], axis=-1), delimiter=',')
 np.savetxt(os.path.join(data_path, 'mean_s2.csv'), jnp.concatenate([*project(m_poisson, posterior_mean_s2, sphere_m_to_3d)], axis=-1), delimiter=',')
-np.savetxt(os.path.join(data_path, 'tracks.csv'), jnp.concatenate([*project(m_cond, v_cond_anomaly, sphere_m_to_3d)], axis=-1), delimiter=',')
+np.savetxt(os.path.join(data_path, 'tracks.csv'), jnp.concatenate([*project(m_cond, v_cond, sphere_m_to_3d)], axis=-1), delimiter=',')
 
 np.savetxt(os.path.join(data_path, 'mean_r2_flat.csv'), jnp.concatenate([*project(m_poisson, posterior_mean_r2, sphere_flat_m_to_3d)], axis=-1), delimiter=',')
 np.savetxt(os.path.join(data_path, 'mean_s2_flat.csv'), jnp.concatenate([*project(m_poisson, posterior_mean_s2, sphere_flat_m_to_3d)], axis=-1), delimiter=',')
-np.savetxt(os.path.join(data_path, 'tracks_flat.csv'), jnp.concatenate([*project(m_cond, v_cond_anomaly, sphere_flat_m_to_3d)], axis=-1), delimiter=',')
+np.savetxt(os.path.join(data_path, 'tracks_flat.csv'), jnp.concatenate([*project(m_cond, v_cond, sphere_flat_m_to_3d)], axis=-1), delimiter=',')
 
 np.savetxt(os.path.join(data_path, 's_r2.csv'), np.diag(np.trace(posterior_cov_r2, axis1=2, axis2=3)), delimiter=',')
 np.savetxt(os.path.join(data_path, 's_s2.csv'), np.diag(np.trace(posterior_cov_s2, axis1=2, axis2=3)), delimiter=',')
