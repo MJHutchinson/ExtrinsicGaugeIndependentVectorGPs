@@ -4,7 +4,7 @@ To reproduce the global wind interpolation results in our paper, simpy run
 ```
 python gp_wind_interpolation.py
 ```
-The data used to reproduce the plots are saved in the `log` directory. Make sure to install all the packages in `requirements_experiments.txt` first and set the correct data paths in the script before running.
+The data used to reproduce the plots are saved in the `log` directory. Before running, make sure to install all the packages in `requirements_experiments.txt` first and set the correct data paths in the script.
 
 In order to perform the experiment from scratch with different configurations and parameter settings (e.g. different date, kernel, satellite), follow the instructions below:
 
