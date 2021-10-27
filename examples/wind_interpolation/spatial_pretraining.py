@@ -78,8 +78,8 @@ def main(logdir, samples, epochs, geometry):
                     num_samples=10)
 
     # Set initial inducing locations on a regular grid
-    lat_init = jnp.linspace(0, jnp.pi, num_points)
-    lon_init = jnp.linspace(0, 2*jnp.pi, num_points)
+    lat_init = jnp.linspace(lat[0], lat[-1], num_points)
+    lon_init = jnp.linspace(lon[0], lon[-1], num_points)
     phi_init, theta_init = jnp.meshgrid(lat_init, lon_init)
     phi_init, theta_init = phi_init.flatten(), theta_init.flatten()
     init_inducing_locations = jnp.stack([phi_init, theta_init], axis=-1)
