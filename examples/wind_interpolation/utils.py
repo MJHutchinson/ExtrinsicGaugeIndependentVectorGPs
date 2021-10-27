@@ -25,18 +25,13 @@ def rad2deg(x: np.ndarray, offset: float = 0.0):
 
 
 def refresh_kernel(
-    key, kernel, m, geometry, init_log_length_scale, init_log_amplitude=None
+    key, kernel, m, init_log_length_scale, init_log_amplitude=None
 ):
     kernel_params = kernel.init_params(key)
     sub_kernel_params = kernel_params.sub_kernel_params
-    if geometry == "r2":
-        sub_kernel_params = sub_kernel_params._replace(
-            log_length_scale=init_log_length_scale
-        )
-    if geometry == "s2":
-        sub_kernel_params = sub_kernel_params._replace(
-            log_length_scale=init_log_length_scale
-        )
+    sub_kernel_params = sub_kernel_params._replace(
+        log_length_scale=init_log_length_scale
+    )
     kernel_params = kernel_params._replace(sub_kernel_params=sub_kernel_params)
     log_amplitude = (
         -jnp.log(kernel.matrix(kernel_params, m, m)[0, 0, 0, 0])
@@ -60,9 +55,27 @@ def GetDataAlongSatelliteTrack(
     climatology: Union[np.ndarray, None] = None,
     space_time: bool = False,
 ) -> List[jnp.ndarray]:
-    """Generate wind data along the trajectories of Aeolus (satellite)
-    More information about the Aeolus satellite: https://www.n2yo.com/satellite/?s=43600
-    https://www.ecmwf.int/sites/default/files/elibrary/2016/16851-esa-adm-aeolus-doppler-wind-lidar-mission-status-and-validation-strategy.pdf
+    """Generate wind data along the trajectories of a given satellite
+    
+        Args:
+            ds: an xarray dataset containing the global wind velocity data
+            satellite: the satellite track used for observation
+            year: year of observation
+            month: month of observation
+            day: day of observation
+            hour: initial hour of observation (e.g. 8 if observation starts at 8am)
+            num_hours: observation duration (in hours)
+            anomaly: option to output the wind speed anomaly around the climatology
+            return_mean: option to output the climatology together with the observation data
+            climatology: an optional numpy array containing the climatology data. If None, it generates the climatology automatically.
+            space_time: option for 3D spacetime output (lat, lon, time)
+            
+        Output:
+            location: an array of size (num_obs, 2) or (num_obs, 3) (the latter if the space_time flag is set to True)
+                      containing the (lat, lon) or (lat, lon, time) information of the satellite track.
+            wind: an array of size (num_obs, 2) containing the (vertical, horizontal) wind speed data 
+                  along the satellite track.
+            mean: the climatology data. Only available when the return_mean flag is set to True.
     """
     date = f"{year}-{month}-{day}"
     lon = deg2rad(ds.isel(time=0).lon.values)  # Range: [0, 2*pi]
