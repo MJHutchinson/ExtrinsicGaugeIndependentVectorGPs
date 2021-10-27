@@ -139,8 +139,8 @@ def main(logdir, samples, epochs, geometry):
     log_length_scales = np.array(log_length_scale)
     log_amplitudes = np.array(log_amplitudes)
 
-    np.save(logdir+"/"+geometry+"_log_length_scalee.npy", log_length_scales.mean())
-    np.save(logdir+"/"+geometry+"_log_amplitudee.npy", log_amplitudes.mean())
+    np.save(logdir+"/"+geometry+"_log_length_scale.npy", log_length_scales.mean())
+    np.save(logdir+"/"+geometry+"_log_amplitude.npy", log_amplitudes.mean())
 
 
 if __name__ == "__main__":
