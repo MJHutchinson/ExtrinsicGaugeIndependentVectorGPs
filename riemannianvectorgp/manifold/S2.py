@@ -9,7 +9,7 @@ from riemannianvectorgp.utils.spherical_harmonics import (
     _spherical_harmonics,
     _d_n,
     _c_nd,
-    _c_n
+    _c_n,
 )
 from riemannianvectorgp.utils import projection_matrix
 from .manifold import AbstractRiemannianMainfold
@@ -45,7 +45,7 @@ class S2(AbstractRiemannianMainfold):
     #     self.constants = np.zeros(
     #         sum([_d_n(n, self.dimension) for n in range(self.max_l + 1)])
     #     )
-        
+
     #     eig_vals = []
     #     cns = []
 
