@@ -6,7 +6,7 @@ python gp_wind_interpolation.py
 ```
 The data used to reproduce the plots are saved in the `log` directory. Before running, make sure to install all the packages in `requirements_experiments.txt` first and set the correct data paths in the script.
 
-In order to perform the experiment from scratch with different configurations and parameter settings (e.g. different date, kernel, satellite), follow the instructions below:
+In order to perform the experiment from scratch under different configurations and parameter settings (e.g. different date, kernel, satellite), follow the instructions below:
 
 ## 1. Installing `xesmf`
 In addition to the packages in `requirements_experiments.txt`, you will need the package `xesmf`, which is more tricky to install. The recomended method is via conda.
