@@ -4,7 +4,7 @@ The main script to perform the global wind interpolation is `gp_wind_interpolati
 The data that we used to produce the plots in our paper are uploaded in the `log` directory, so you can run this script directly to reproduce our results without having to run anything else (provided that you set the correct data paths in the script).
 
 ### Requirements
-You need to install the packages in `requirements.txt'.
+You need to install the packages in `requirements.txt`.
 
 ## Producing the results from scratch
 In order to produce the results from scratch (for example with different configurations and parameter settings), follow the instructions below:
