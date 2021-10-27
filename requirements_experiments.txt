@@ -2,8 +2,8 @@ matplotlib
 jupyter
 dask
 cdsapi
-pickle
 click
 xarray
 skyfield
 netcdf4
+tensorflow==2.7.0rc1
