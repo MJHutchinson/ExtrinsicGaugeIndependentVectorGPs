@@ -21,20 +21,29 @@ import click
 import pickle
 
 
-def _get_v_cond(ds, date, climatology):
+def _get_v_cond(ds, date):
     u = ds.u10.sel(time=date)
     v = ds.v10.sel(time=date)
-    week_number = u["time"].dt.isocalendar().week
-    u_mean = climatology["u"][week_number - 1]
-    v_mean = climatology["v"][week_number - 1]
-    u_anomaly = u.values - u_mean
-    v_anomaly = v.values - v_mean
-    u_anomaly, v_anomaly = (
-        u_anomaly.transpose().flatten(),
-        v_anomaly.transpose().flatten(),
-    )
-    v_cond = np.stack([v_anomaly, u_anomaly], axis=-1)
+    u_reshape = u.values.transpose().flatten()
+    v_reshape = v.values.transpose().flatten()
+    v_cond = np.stack([v_reshape, u_reshape], axis=-1)
     return v_cond
+
+
+# def _get_v_cond(ds, date, climatology):
+#     u = ds.u10.sel(time=date)
+#     v = ds.v10.sel(time=date)
+#     week_number = u["time"].dt.isocalendar().week
+#     u_mean = climatology["u"][week_number - 1]
+#     v_mean = climatology["v"][week_number - 1]
+#     u_anomaly = u.values - u_mean
+#     v_anomaly = v.values - v_mean
+#     u_anomaly, v_anomaly = (
+#         u_anomaly.transpose().flatten(),
+#         v_anomaly.transpose().flatten(),
+#     )
+#     v_cond = np.stack([v_anomaly, u_anomaly], axis=-1)
+#     return v_cond
 
 
 @click.command()
@@ -52,7 +61,7 @@ def main(logdir, samples, epochs, geometry):
     idxs = jr.permutation(next(rng), idxs)  # Shuffle indices
 
     # Load climatology
-    climatology = np.load("../../datasets/climatology/weekly_climatology.npz")
+    # climatology = np.load("../../datasets/climatology/weekly_climatology.npz")
 
     # Get input locations
     lon = ds.isel(time=0).lon
@@ -101,7 +110,7 @@ def main(logdir, samples, epochs, geometry):
         # Initialise parameters and state
         params, state = sparse_gp.init_params_with_state(next(rng))
         kernel_params = refresh_kernel(
-            next(rng), kernel, m_cond, geometry, init_log_length_scale
+            next(rng), kernel, m_cond, init_log_length_scale
         )
 
         params = params._replace(kernel_params=kernel_params)
@@ -111,32 +120,27 @@ def main(logdir, samples, epochs, geometry):
         state = sparse_gp.randomize(params, state, next(rng))
 
         # Get conditioning values
-        v_cond = _get_v_cond(ds, date, climatology)
+        # v_cond = _get_v_cond(ds, date, climatology)
+        v_cond = _get_v_cond(ds, date)
 
         # Train sparse GP
         params, state, _ = train_sparse_gp(
             sparse_gp, params, state, m_cond, v_cond, rng, epochs=epochs
         )
 
-        if geometry == "r2":
-            log_length_scale = params.kernel_params.sub_kernel_params.log_length_scales
-            log_amplitude = params.kernel_params.log_amplitude
-        elif geometry == "s2":
-            log_length_scale = params.kernel_params.sub_kernel_params.log_length_scale
-            log_amplitude = params.kernel_params.log_amplitude
+        log_length_scale = params.kernel_params.sub_kernel_params.log_length_scale
+        log_amplitude = params.kernel_params.log_amplitude
 
         print("Log length scale:", log_length_scale, "Log amplitude:", log_amplitude)
 
-        log_length_scales.append(log_length_scale)
-        log_amplitudes.append(log_amplitude)
+        log_length_scales.append(np.asarray(log_length_scale))
+        log_amplitudes.append(np.asarray(log_amplitude))
 
-    log_length_scales = np.stack(log_length_scales)
-    log_amplitudes = np.stack(log_amplitudes)
+    log_length_scales = np.array(log_length_scale)
+    log_amplitudes = np.array(log_amplitudes)
 
-    np.save(logdir + "/" + geometry + "_log_length_scale.npy", log_length_scales.mean())
-
-    # with open(logdir+'/'+geometry+'_params_pretrained.pickle', "wb") as f:
-    #     pickle.dump({'log_length_scale': log_length_scales, 'log_amplitude': log_amplitudes}, f)
+    np.save(logdir+"/"+geometry+"_log_length_scale.npy", log_length_scales.mean())
+    np.save(logdir+"/"+geometry+"_log_amplitude.npy", log_amplitudes.mean())
 
 
 if __name__ == "__main__":

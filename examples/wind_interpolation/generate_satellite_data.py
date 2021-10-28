@@ -8,8 +8,6 @@ from examples.wind_interpolation.utils import (
     GetDataAlongSatelliteTrack,
 )
 from skyfield.api import load, EarthSatellite
-import click
-import pickle
 import xesmf as xe
 import os
 
