@@ -22,7 +22,7 @@ with open(os.path.join(scripts_dir, "render.py")) as file:
     exec(file.read())
 
 reset_scene()
-set_renderer_settings(num_samples=2048 if bpy.app.background else 128)
+set_renderer_settings(num_samples=16384 if bpy.app.background else 128)
 setup_layers()
 setup_compositor(
     mask_center=(0.5, 0.3125),
@@ -34,7 +34,7 @@ setup_compositor(
     angle=(-np.pi / 16, 0, 0),
     lens=85,
     height=2560,
-    crop=(1 / 5, 9 / 10, 1 / 10, 9.5 / 11),
+    crop=(1 / 5, 9 / 10, 1 / 7, 8 / 10),
 )
 setup_lighting(
     shifts=(-10, -10, 10),
