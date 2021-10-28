@@ -7,3 +7,4 @@ blender -b -P project_to_sphere.py
 # blender -b -P wrong_to_right.py
 blender -b -P rewrap_sphere.py
 blender -b -P right_stils.py
+blender -b -P wind_data_sphere_plots_anim.py

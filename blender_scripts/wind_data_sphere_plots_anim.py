@@ -23,7 +23,7 @@ with open(os.path.join(scripts_dir, "render.py")) as file:
     exec(file.read())
 
 reset_scene()
-set_renderer_settings(num_samples=2048 if bpy.app.background else 1)
+set_renderer_settings(num_samples=128 if bpy.app.background else 1)
 setup_layers()
 setup_compositor(
     mask_center=(0.5, 0.3125),
@@ -44,7 +44,7 @@ setup_lighting(
     horizontal_angles=(-np.pi / 6, np.pi / 3, np.pi / 3),
     vertical_angles=(-np.pi / 3, -np.pi / 6, np.pi / 4),
 )
-set_resolution(580, aspect=(3, 2))
+set_resolution(1080, aspect=(3, 2))
 
 bd_obj = create_backdrop(location=(0, 0, -1), scale=(10, 5, 5))
 arr_obj = create_vector_arrow(color=(0.7, 0.7, 0.7, 1))
@@ -117,9 +117,9 @@ for angle in [-180, -90, 0, 90, 180, 270, 360, 450, 540]:
     empty.rotation_euler = Euler(
         (math.radians(160), math.radians(-25), math.radians(125 + angle)), "XYZ"
     )
-    empty.keyframe_insert(data_path="rotation_euler", frame=int(angle / 4))
+    empty.keyframe_insert(data_path="rotation_euler", frame=int(angle / 2))
 
-bpy.context.scene.frame_end = int(360 / 4)
+bpy.context.scene.frame_end = int(360 / 2)
 bpy.context.scene.frame_current = bpy.context.scene.frame_start
 
 bpy.context.scene.render.filepath = os.path.join(
